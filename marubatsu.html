@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta author="Google Gemini">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手書き風まるばつゲーム</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        canvas {
+            border: 4px solid #333;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            touch-action: none;
+        }
+        #message-box {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            min-height: 24px;
+            text-align: center;
+        }
+        #button-container {
+            display: flex;
+            gap: 10px;
+        }
+        .game-button {
+            padding: 10px 24px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        .game-button:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+        .game-button:active {
+            transform: translateY(0);
+        }
+        #hint-button {
+            background-color: #28a745;
+        }
+        #hint-button:hover {
+            background-color: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="message-box">ゲーム開始！</div>
+        <canvas id="gameCanvas" width="300" height="300"></canvas>
+        <div id="button-container">
+            <button id="reset-button" class="game-button">リセット</button>
+            <button id="hint-button" class="game-button">ヒント</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const messageBox = document.getElementById('message-box');
+            const resetButton = document.getElementById('reset-button');
+            const hintButton = document.getElementById('hint-button');
+
+            // Constants
+            const BOARD_SIZE = 3;
+            const CELL_SIZE = canvas.width / BOARD_SIZE;
+            const X_COLOR = '#ff0000';
+            const O_COLOR = '#0000ff';
+
+            // Helper function to get a random value within a range
+            const getRandom = (min, max) => Math.random() * (max - min) + min;
+            
+            // Represents the game state
+            class Game {
+                constructor() {
+                    this.board = new Board();
+                    this.currentPlayer = 'O'; // Start with 'O'
+                    this.winner = null;
+                    this.isOver = false;
+                    this.hintCell = -1;
+                }
+
+                // Resets the game to its initial state
+                reset() {
+                    this.board.reset();
+                    this.currentPlayer = 'O';
+                    this.winner = null;
+                    this.isOver = false;
+                    this.hintCell = -1;
+                    this.updateMessage('ゲーム開始！');
+                }
+
+                // Switches the current player
+                switchPlayer() {
+                    this.currentPlayer = this.currentPlayer === 'O' ? 'X' : 'O';
+                }
+
+                // Checks for a winner or a draw
+                checkWin() {
+                    const lines = [
+                        // Rows
+                        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                        // Columns
+                        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                        // Diagonals
+                        [0, 4, 8], [2, 4, 6]
+                    ];
+
+                    for (let line of lines) {
+                        const [a, b, c] = line;
+                        if (this.board.cells[a] && this.board.cells[a] === this.board.cells[b] && this.board.cells[a] === this.board.cells[c]) {
+                            this.winner = this.board.cells[a];
+                            this.isOver = true;
+                            this.updateMessage(`${this.winner} の勝ち！`);
+                            return;
+                        }
+                    }
+
+                    if (this.board.isFull() && !this.winner) {
+                        this.isOver = true;
+                        this.updateMessage('引き分け！');
+                    }
+                }
+                
+                // Finds the optimal move using a simple minimax-like approach
+                getOptimalMove(player) {
+                    const availableMoves = this.board.getAvailableCells();
+                    // Check for a winning move
+                    for (let move of availableMoves) {
+                        this.board.cells[move] = player;
+                        if (this.board.checkWinner(player)) {
+                            this.board.cells[move] = null;
+                            return move;
+                        }
+                        this.board.cells[move] = null;
+                    }
+
+                    // Check to block the opponent's winning move
+                    const opponent = player === 'O' ? 'X' : 'O';
+                    for (let move of availableMoves) {
+                        this.board.cells[move] = opponent;
+                        if (this.board.checkWinner(opponent)) {
+                            this.board.cells[move] = null;
+                            return move;
+                        }
+                        this.board.cells[move] = null;
+                    }
+
+                    // Take the center if available
+                    if (availableMoves.includes(4)) {
+                        return 4;
+                    }
+
+                    // Take a corner if available
+                    const corners = [0, 2, 6, 8];
+                    for (let corner of corners) {
+                        if (availableMoves.includes(corner)) {
+                            return corner;
+                        }
+                    }
+
+                    // Take a side if available
+                    const sides = [1, 3, 5, 7];
+                    for (let side of sides) {
+                        if (availableMoves.includes(side)) {
+                            return side;
+                        }
+                    }
+                    return -1; // No optimal move found
+                }
+
+                // Updates the message box
+                updateMessage(text) {
+                    messageBox.textContent = text;
+                }
+            }
+
+            // Represents the game board
+            class Board {
+                constructor() {
+                    this.cells = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+                }
+
+                // Resets the cells
+                reset() {
+                    this.cells.fill(null);
+                }
+
+                // Draws the board and the moves with a hand-drawn feel
+                draw() {
+                    // Clear canvas, but keep border
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw hand-drawn grid lines ("井" character)
+                    ctx.strokeStyle = '#333';
+                    const offset = 10; // To make the lines not go to the edge
+                    for (let i = 1; i < BOARD_SIZE; i++) {
+                        // Vertical lines
+                        ctx.beginPath();
+                        ctx.lineWidth = getRandom(4, 6);
+                        ctx.moveTo(i * CELL_SIZE + getRandom(-2, 2), 0 + getRandom(0, offset));
+                        ctx.lineTo(i * CELL_SIZE + getRandom(-2, 2), canvas.height - getRandom(0, offset));
+                        ctx.stroke();
+
+                        // Horizontal lines
+                        ctx.beginPath();
+                        ctx.lineWidth = getRandom(4, 6);
+                        ctx.moveTo(0 + getRandom(0, offset), i * CELL_SIZE + getRandom(-2, 2));
+                        ctx.lineTo(canvas.width - getRandom(0, offset), i * CELL_SIZE + getRandom(-2, 2));
+                        ctx.stroke();
+                    }
+
+                    // Draw 'O' and 'X'
+                    this.cells.forEach((value, index) => {
+                        const row = Math.floor(index / BOARD_SIZE);
+                        const col = index % BOARD_SIZE;
+                        const centerX = col * CELL_SIZE + CELL_SIZE / 2;
+                        const centerY = row * CELL_SIZE + CELL_SIZE / 2;
+                        const padding = CELL_SIZE * 0.2;
+
+                        if (value === 'O') {
+                            this.drawHandDrawnO(centerX, centerY, CELL_SIZE / 2 - padding);
+                        } else if (value === 'X') {
+                            this.drawHandDrawnX(centerX, centerY, CELL_SIZE / 2 - padding);
+                        }
+                    });
+
+                    // Highlight the hint cell
+                    if (game.hintCell !== -1) {
+                        const row = Math.floor(game.hintCell / BOARD_SIZE);
+                        const col = game.hintCell % BOARD_SIZE;
+                        ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+                        ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+
+                // Draws a hand-drawn 'O'
+                drawHandDrawnO(x, y, radius) {
+                    const numSegments = 20;
+                    ctx.strokeStyle = O_COLOR;
+                    for (let i = 0; i < numSegments; i++) {
+                        const angleStart = (i / numSegments) * (2 * Math.PI) + getRandom(-0.1, 0.1);
+                        const angleEnd = ((i + 1) / numSegments) * (2 * Math.PI) + getRandom(-0.1, 0.1);
+                        ctx.beginPath();
+                        ctx.lineWidth = getRandom(4, 6);
+                        ctx.arc(x + getRandom(-1, 1), y + getRandom(-1, 1), radius + getRandom(-2, 2), angleStart, angleEnd);
+                        ctx.stroke();
+                    }
+                }
+
+                // Draws a hand-drawn 'X'
+                drawHandDrawnX(x, y, size) {
+                    const numSegments = 10;
+                    ctx.strokeStyle = X_COLOR;
+
+                    // First line
+                    for (let i = 0; i < numSegments; i++) {
+                        const startX = x - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const startY = y - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const endX = x - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const endY = y - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
+                        ctx.beginPath();
+                        ctx.lineWidth = getRandom(4, 6);
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    }
+                    
+                    // Second line
+                    for (let i = 0; i < numSegments; i++) {
+                        const startX = x + size - (i / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const startY = y - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const endX = x + size - ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
+                        const endY = y - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
+                        ctx.beginPath();
+                        ctx.lineWidth = getRandom(4, 6);
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    }
+                }
+
+                // Returns the index of the cell at a given coordinate
+                getCellIndex(x, y) {
+                    const col = Math.floor(x / CELL_SIZE);
+                    const row = Math.floor(y / CELL_SIZE);
+                    return row * BOARD_SIZE + col;
+                }
+                
+                // Checks if all cells are filled
+                isFull() {
+                    return this.cells.every(cell => cell !== null);
+                }
+
+                // Checks for a winner for a given player
+                checkWinner(player) {
+                    const lines = [
+                        // Rows
+                        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                        // Columns
+                        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                        // Diagonals
+                        [0, 4, 8], [2, 4, 6]
+                    ];
+                    return lines.some(line => {
+                        const [a, b, c] = line;
+                        return this.cells[a] === player && this.cells[b] === player && this.cells[c] === player;
+                    });
+                }
+
+                // Gets all available cells
+                getAvailableCells() {
+                    const available = [];
+                    for (let i = 0; i < this.cells.length; i++) {
+                        if (this.cells[i] === null) {
+                            available.push(i);
+                        }
+                    }
+                    return available;
+                }
+            }
+
+            // Main game logic
+            const game = new Game();
+
+            // Event listener for canvas click
+            canvas.addEventListener('click', (event) => {
+                if (game.isOver) {
+                    return;
+                }
+
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const index = game.board.getCellIndex(x, y);
+                
+                // If the cell is not taken, make a move
+                if (game.board.cells[index] === null) {
+                    game.board.cells[index] = game.currentPlayer;
+                    game.hintCell = -1; // Clear hint after move
+                    game.board.draw();
+                    game.checkWin();
+                    if (!game.isOver) {
+                        game.switchPlayer();
+                        game.updateMessage(`${game.currentPlayer} のターン`);
+                    }
+                }
+            });
+
+            // Event listener for reset button
+            resetButton.addEventListener('click', () => {
+                game.reset();
+                game.board.draw();
+            });
+
+            // Event listener for hint button
+            hintButton.addEventListener('click', () => {
+                if (game.isOver) {
+                    game.updateMessage('ゲームは終了しています');
+                    return;
+                }
+                // Only provide hint for the current player
+                game.hintCell = game.getOptimalMove(game.currentPlayer);
+                if (game.hintCell !== -1) {
+                    game.updateMessage(`最適な手はマス${game.hintCell + 1}です`);
+                    game.board.draw();
+                } else {
+                    game.updateMessage('ヒントが見つかりませんでした');
+                }
+            });
+
+            // Initial draw
+            game.board.draw();
+        });
+    </script>
+</body>
+</html>

@@ -1,402 +1,437 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
+  <head>
     <meta charset="UTF-8">
-    <meta author="Google Gemini">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>手書き風まるばつゲーム</title>
+    <title>Simple Mapper</title>
     <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        #game-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        canvas {
-            border: 4px solid #333;
-            background-color: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            touch-action: none;
-        }
-        #message-box {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #333;
-            min-height: 24px;
-            text-align: center;
-        }
-        #button-container {
-            display: flex;
-            gap: 10px;
-        }
-        .game-button {
-            padding: 10px 24px;
-            font-size: 1rem;
-            font-weight: bold;
-            color: #fff;
-            background-color: #007bff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.1s;
-        }
-        .game-button:hover {
-            background-color: #0056b3;
-            transform: translateY(-2px);
-        }
-        .game-button:active {
-            transform: translateY(0);
-        }
-        #hint-button {
-            background-color: #28a745;
-        }
-        #hint-button:hover {
-            background-color: #1e7e34;
-        }
+      body {
+          background-color: #111817; 
+          color: #f3f4f6; 
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+          font-family: sans-serif;
+	  width:90%;
+      }
+      p {
+          font-size: 0.7rem;
+      }
+      .map-grid {
+          display: grid;
+          grid-template-columns: repeat(100, 1fr);
+          width: 100%;
+          height: 100%;
+          border: 1px solid #448;
+          box-shadow: 0 0 10px rgba(0, 0, 58, 0.5);
+      }
+      .cell {
+	  width: 20px;
+	  height: 20px;
+	  background-color: black;
+	  cursor: pointer;
+	  transition: border-color 0.1s ease-out;
+	  border: 1px dotted rgba(55, 55, 155, 0.5);
+	  box-sizing: border-box; 
+      }
+      .cell.grid-line-col { border-right: 1px solid #228; }
+      .cell.grid-line-row { border-bottom: 1px solid #228;}
+      .cell.explored { border: 1px dotted #228;}
+      .cell.explored.grid-line-col { border-right: 1px solid #444; }
+      .cell.explored.grid-line-row { border-bottom: 1px solid #444;}
+      
+      .status-message {
+          margin-top: 0rem;
+	  height:0.3rem;
+          padding: 0.2rem;
+          font-size: 0.5rem;
+          border-radius: 0.25rem; 
+          transition: opacity 0.3s;
+          opacity: 0;
+          user-select: none;
+      }
+      
+      .bg-green { background-color: #059669; } /* bg-green-600 */
+      .bg-yellow { background-color: #ca8a04; } /* bg-yellow-600 */
+      .bg-red { background-color: #dc2626; } /* bg-red-600 */
+
+      .pal-con {
+	  --left: calc(100% - 2rem - 100px); /* 初期位置: right 2rem */
+	  --top: 2vh;	  
+          position: fixed;
+	  left: var(--left);
+          top: var(--top);
+          padding: 1.5rem 0.5rem 0.5rem;
+          background-color: rgba(31, 41, 55, 0.7); /* bg-gray-800 bg-opacity-70 */
+          border-radius: 0.5rem; /* rounded-lg */
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2); /* shadow-xl */
+          flex-shrink: 0;
+	  width:100px;
+          z-index: 50;
+          cursor: grab;
+          transition: box-shadow 0.1s;
+	  cursor: grab;
+      }
+      .pal-con.grabbing {
+          cursor: grabbing;
+      }
+      .grip-icon {
+          position: absolute;
+          top: 0rem; 
+          right: 0.5rem;
+          padding: 0rem;
+          color: #9ca3af;
+          opacity: 0.8; 
+          pointer-events: none;
+      }
+      .mark-col {
+          gap: 0.25rem;
+          box-shadow: 0 0 2px rgba(2, 2, 2, 1);	  
+      }
+      .col-btn {
+          width: 20px; 
+          height: 20px;
+	  margin:1px;
+          border-radius: 0.2rem;
+          transition: transform 0.1s, box-shadow 0.1s;
+	  cursor: pointer;
+      }
+      .col-btn:hover {
+          transform: scale(1.1);
+          box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+      }
+      .select-col {
+          box-shadow: 0 0 2px rgba(2, 2, 2, 1);
+      }
+      
+      .btn {
+	  text-align: center;
+          background-color: rgba(7, 34, 59, 0.95);
+	  color:white;
+          border-radius: 4px;
+	  border: 1px solid rgba(175, 240, 390, 0.5);
+	  font-size: 0.8rem;
+	  transition: background-color 0.2s;
+	  width: 14%;
+	  margin:10px;
+      }
+      .btn:hover {
+          background-color: rgba(175, 240, 390, 0.95);
+	  color:black;
+	  box-shadow: 0 4px 12px rgba(143, 143, 143, 0.7);	  
+	  cursor:pointer;
+      }
+      
+      .is-hidden {
+          opacity: 0;
+          pointer-events: none; 
+      }
+      
+      .loading-overlay {
+          position: absolute;
+          inset: 0;
+          background-color: rgba(17, 24, 39, 0.95); 
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          transition: opacity 0.3s;
+      }
+      .loading-text {
+          margin-top: 1rem;
+          font-size: 1.25rem;
+      }
+      .spinner {
+          border: 4px solid rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          border-top: 4px solid #fff;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+      }
+      .menu {
+	  display:flex;
+	  flex-direction:row;
+      }
+      
     </style>
-</head>
-<body>
-    <div id="game-container">
-        <div id="message-box">ゲーム開始！</div>
-        <canvas id="gameCanvas" width="300" height="300"></canvas>
-        <div id="button-container">
-            <button id="reset-button" class="game-button">リセット</button>
-            <button id="hint-button" class="game-button">ヒント</button>
-        </div>
+  </head>
+  <body>
+    <strong>Simple Wiz Mapper </strong>    
+    <div class="menu">    
+      <div class="btn" id="pal">Color Pallete</div>      
+      <div class="btn" id="clr-map">All Clear</div>
+      <div class="btn" id="save">Print</div>
+      <div class="btn" id="menu1">menu1</div>
+      <div class="btn" id="menu2">menu2</div>
+      <div class="btn" id="menu3">menu3</div>                  
+    </div>
+    
+    <div id="status-message" class="status-message"></div>
+    <div id="map-con" class="map-grid"></div>
+    <div id="pal-con" class="pal-con" title="draggable color pal">
+      <div class="grip-icon"> ⠿  </div>
+      <div id="col-pal"></div>
+    </div>
+    
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <p class="loading-text">Loading...</p>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const canvas = document.getElementById('gameCanvas');
-            const ctx = canvas.getContext('2d');
-            const messageBox = document.getElementById('message-box');
-            const resetButton = document.getElementById('reset-button');
-            const hintButton = document.getElementById('hint-button');
+    <script type="module">
+      const PAL_COLORS = [
+          '#FFFFFF', // 0: White 
+          '#FF0000', // 1: Red 
+          '#00FF00', // 2: Green
+          '#0000FF', // 3: Blue
+          '#FFFF00', // 4: Yellow
+          '#FF00FF', // 5: Magenta
+          '#00FFFF', // 6: Cyan
+          '#FFA500', // 7: Orange
+          '#800080', // 8: Purple
+          '#008000', // 9: Dark Green
+          '#800000', // 10: Maroon
+          '#40E0D0', // 11: Turquoise
+          '#FFC0CB', // 12: Pink
+          '#A52A2A', // 13: Brown
+          '#808080', // 14: Gray
+          '#000000'  // 15: Black
+      ];
+      const COLOR_MAP = PAL_COLORS.reduce((a, c, i) => {
+          a[i] = c;
+          return a;
+      }, {});
+      const GRID_SIZE = 100;
+      const MAP_KEY = 'simple_wiz_mapper';
+      let mapState = new Uint8Array(GRID_SIZE * GRID_SIZE).fill(15); // mapState: 10,000マス分を保持する配列 
+      let mapCon = document.getElementById('map-con');
+      let statusMessage = document.getElementById('status-message');
+      let selCol = 0;        // default is white
+      const palCon = document.getElementById('pal-con');
+      let isDrag = false;
+      let dragOffX = 0;
+      let dragOffY = 0;
+      let inPal = false; // パレット操作中かどうかを判定するためのフラグ
+      
+      /**
+       * ステータスメッセージを表示し、一定時間後に消す
+       */
+      const showStatus = (message, bgColorClass) => {
+          statusMessage.textContent = message;
+          statusMessage.className = `status-message transition-opacity opacity-100 bg-${bgColorClass}`;
+          setTimeout(() => {
+              statusMessage.classList.remove('opacity-100');
+              statusMessage.classList.add('opacity-0');
+          }, 2000);
+      };
 
-            // Constants
-            const BOARD_SIZE = 3;
-            const CELL_SIZE = canvas.width / BOARD_SIZE;
-            const X_COLOR = '#ff0000';
-            const O_COLOR = '#0000ff';
+      /**
+       * マップの状態をLocal Storageに保存する
+       */
+      const saveMap = () => {
+          try {             // Uint8Arrayを1桁HEX文字列に変換（10,000文字）
+              const mapString = Array.from(mapState).map(v => v.toString(16)).join('');
+              localStorage.setItem(MAP_KEY, mapString);
+          } catch (error) {
+              console.error("Local Storage save error:", error);
+              showStatus('保存エラーが発生しました', 'red');
+          }
+      };
 
-            // Helper function to get a random value within a range
-            const getRandom = (min, max) => Math.random() * (max - min) + min;
-            
-            // Represents the game state
-            class Game {
-                constructor() {
-                    this.board = new Board();
-                    this.currentPlayer = 'O'; // Start with 'O'
-                    this.winner = null;
-                    this.isOver = false;
-                    this.hintCell = -1;
-                }
+      /**
+       * グリッドUIを現在のmapStateに基づいて描画または更新する
+       */
+      const renderGrid = () => {
+	  if (mapCon.children.length === 0) {
+              mapCon.innerHTML = '';
+              for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+		  const cell = document.createElement('div');
+		  cell.classList.add('cell');
+		  cell.dataset.idx = i;
+		  const col = i % GRID_SIZE; // 列番号 (0-99)
+		  if (col % 10 === 9 && col < GRID_SIZE - 1) { // 10, 20, ..., 90列目（最後の列は除く）
+                      cell.classList.add('grid-line-col');
+		  }
+		  const row = Math.floor(i / GRID_SIZE); // 行番号 (0-99)
+		  if (row % 10 === 9 && row < GRID_SIZE - 1) { // 10, 20, ..., 90行目（最後の行は除く）
+                      cell.classList.add('grid-line-row');
+		  }
+		  mapCon.appendChild(cell);
+              }
+	  }
+	  for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+              const cell = mapCon.children[i];
+              const colorIdx = mapState[i];
+              if (colorIdx !== 15) {
+		  cell.classList.add('explored');
+		  cell.style.backgroundColor = COLOR_MAP[colorIdx];
+              } else {
+		  cell.classList.remove('explored');
+		  cell.style.backgroundColor = '#111';
+              }
+	  }
+      };      
 
-                // Resets the game to its initial state
-                reset() {
-                    this.board.reset();
-                    this.currentPlayer = 'O';
-                    this.winner = null;
-                    this.isOver = false;
-                    this.hintCell = -1;
-                    this.updateMessage('ゲーム開始！');
-                }
+      /**
+       * マス目のクリックイベントハンドラ
+       */
+      const handleCell = (i, r) => {
+          const c = mapState[i];
+          if (r) {          // Right click
+              mapState[i] = 15;
+	      console.log('color',c);	      
+              renderGrid();
+              saveMap();
+          } else {          // left click
+	      mapState[i] = selCol;
+              renderGrid();
+              saveMap();
+	  }
+      };
 
-                // Switches the current player
-                switchPlayer() {
-                    this.currentPlayer = this.currentPlayer === 'O' ? 'X' : 'O';
-                }
+      /**
+       * Local Storageからマップの状態をロードする
+       */
+      const loadMap = () => {
+          const mapString = localStorage.getItem(MAP_KEY);
+          if (mapString && mapString.length === GRID_SIZE * GRID_SIZE ) {
+              for (let i = 0; i < mapState.length; i++) {      
+                  mapState[i] = parseInt(mapString[i], 16);
+              }
+              showStatus('マップをローカルからロードしました', 'green');
+          } else {
+              showStatus('新規マップを作成しました', 'yellow');
+              mapState.fill(15);
+          }
+          renderGrid();
+          document.getElementById('loading-overlay').classList.add('is-hidden');
+      };
 
-                // Checks for a winner or a draw
-                checkWin() {
-                    const lines = [
-                        // Rows
-                        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-                        // Columns
-                        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-                        // Diagonals
-                        [0, 4, 8], [2, 4, 6]
-                    ];
+      
 
-                    for (let line of lines) {
-                        const [a, b, c] = line;
-                        if (this.board.cells[a] && this.board.cells[a] === this.board.cells[b] && this.board.cells[a] === this.board.cells[c]) {
-                            this.winner = this.board.cells[a];
-                            this.isOver = true;
-                            this.updateMessage(`${this.winner} の勝ち！`);
-                            return;
-                        }
-                    }
+      /**
+       * カラーパレット生成
+       */
+      const createPal = () => {
+          const palDiv = document.getElementById('col-pal');
+          palDiv.innerHTML = `<div id="mark-col" class="mark-col-grid"></div>`;
+          const markerColorsDiv = document.getElementById('mark-col');
+          PAL_COLORS.forEach((c, i) => {
+              const b = document.createElement('button');
+              b.classList.add('col-btn');
+              b.style.backgroundColor = c;
+              b.dataset.colorIdx = i;
+              let targetDiv;
+              targetDiv = markerColorsDiv;
+              if (i === selCol) {
+                  b.classList.add('select-col');
+              }
+              b.addEventListener('click', () => {
+                  inPal = true;
+                  document.querySelectorAll('.select-col').forEach(btn => {
+                      btn.classList.remove('select-col');
+                  });
+                  selCol = i;
+                  b.classList.add('select-col');
+              });
+              targetDiv.appendChild(b);
+          });
+      };
+      
+      (() => {
+          createPal();
+          loadMap(); // load from browser Local Storage
+      })();
 
-                    if (this.board.isFull() && !this.winner) {
-                        this.isOver = true;
-                        this.updateMessage('引き分け！');
-                    }
-                }
-                
-                // Finds the optimal move using a simple minimax-like approach
-                getOptimalMove(player) {
-                    const availableMoves = this.board.getAvailableCells();
-                    // Check for a winning move
-                    for (let move of availableMoves) {
-                        this.board.cells[move] = player;
-                        if (this.board.checkWinner(player)) {
-                            this.board.cells[move] = null;
-                            return move;
-                        }
-                        this.board.cells[move] = null;
-                    }
+      mapCon.addEventListener('click', (e) => {
+          const cell = e.target.closest('.cell');
+          if (cell) {
+              const i = parseInt(cell.dataset.idx);
+              handleCell(i, false); // left click
+          }
+      });
 
-                    // Check to block the opponent's winning move
-                    const opponent = player === 'O' ? 'X' : 'O';
-                    for (let move of availableMoves) {
-                        this.board.cells[move] = opponent;
-                        if (this.board.checkWinner(opponent)) {
-                            this.board.cells[move] = null;
-                            return move;
-                        }
-                        this.board.cells[move] = null;
-                    }
+      mapCon.addEventListener('contextmenu', (e) => {
+          const cell = e.target.closest('.cell');
+          if (cell) {
+              e.preventDefault(); // ブラウザのコンテキストメニューを無効化
+              const i = parseInt(cell.dataset.idx);
+              if(mapState[i] !== 15) {
+                  handleCell(i, true); // 右クリックとして処理
+              }
+          }
+      });
 
-                    // Take the center if available
-                    if (availableMoves.includes(4)) {
-                        return 4;
-                    }
+      palCon.addEventListener('mousedown', (e) => {
+	  if (e.target.closest('button')) {
+	      inPal = true; 
+              e.stopPropagation();
+              return;
+	  }
+          isDrag = true;
+          palCon.classList.add('grabbing');
+          const rect = palCon.getBoundingClientRect();
+	  console.log('Dragging ', rect.left, rect.top);
+          dragOffX = e.clientX - rect.left;
+          dragOffY = e.clientY - rect.top;
+          palCon.style.top = `${rect.top}px`;
+          palCon.style.left = `${rect.left}px`;
+          palCon.style.position = 'fixed'; 
+          e.preventDefault(); // avoid text selection
+	  e.stopPropagation();
+      });
 
-                    // Take a corner if available
-                    const corners = [0, 2, 6, 8];
-                    for (let corner of corners) {
-                        if (availableMoves.includes(corner)) {
-                            return corner;
-                        }
-                    }
+      document.addEventListener('mousemove', (e) => {
+          if (!isDrag) return;
+	  // console.log('mousemove',e.clientX, e.clientY);
+          let newX = e.clientX - dragOffX;
+          let newY = e.clientY - dragOffY;
+          const maxX = window.innerWidth - palCon.offsetWidth;
+          const maxY = window.innerHeight - palCon.offsetHeight;
+          newX = Math.max(0, Math.min(newX, maxX));
+          newY = Math.max(0, Math.min(newY, maxY));
+          palCon.style.left = `${newX}px`;
+          palCon.style.top = `${newY}px`;
+      });
+      
+      window.addEventListener('resize', () => {
+	  const rect = palCon.getBoundingClientRect();
+	  let newX = rect.left;
+	  let newY = rect.top;
+	  const maxX = window.innerWidth - palCon.offsetWidth;
+	  const maxY = window.innerHeight - palCon.offsetHeight;
+	  newX = Math.max(0, Math.min(newX, maxX));
+	  newY = Math.max(0, Math.min(newY, maxY));
+	  palCon.style.left = `${newX}px`;
+	  palCon.style.top = `${newY}px`;
+      });
+      
+      document.addEventListener('mouseup', () => {
+          if (isDrag) {
+	      console.log('mouseup, drag stopped');
+              isDrag = false;
+              palCon.classList.remove('grabbing');
+          }
+	  inPal=false;
+      });
 
-                    // Take a side if available
-                    const sides = [1, 3, 5, 7];
-                    for (let side of sides) {
-                        if (availableMoves.includes(side)) {
-                            return side;
-                        }
-                    }
-                    return -1; // No optimal move found
-                }
+      // リセットボタン
+      const clrMap = document.getElementById('clr-map');
+      clrMap.addEventListener('click', () => {
+	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
+              mapState.fill(15);
+              renderGrid();
+              saveMap();
+              showStatus('マップをリセットしました', 'yellow');
 
-                // Updates the message box
-                updateMessage(text) {
-                    messageBox.textContent = text;
-                }
-            }
-
-            // Represents the game board
-            class Board {
-                constructor() {
-                    this.cells = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
-                }
-
-                // Resets the cells
-                reset() {
-                    this.cells.fill(null);
-                }
-
-                // Draws the board and the moves with a hand-drawn feel
-                draw() {
-                    // Clear canvas, but keep border
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                    // Draw hand-drawn grid lines ("井" character)
-                    ctx.strokeStyle = '#333';
-                    const offset = 10; // To make the lines not go to the edge
-                    for (let i = 1; i < BOARD_SIZE; i++) {
-                        // Vertical lines
-                        ctx.beginPath();
-                        ctx.lineWidth = getRandom(4, 6);
-                        ctx.moveTo(i * CELL_SIZE + getRandom(-2, 2), 0 + getRandom(0, offset));
-                        ctx.lineTo(i * CELL_SIZE + getRandom(-2, 2), canvas.height - getRandom(0, offset));
-                        ctx.stroke();
-
-                        // Horizontal lines
-                        ctx.beginPath();
-                        ctx.lineWidth = getRandom(4, 6);
-                        ctx.moveTo(0 + getRandom(0, offset), i * CELL_SIZE + getRandom(-2, 2));
-                        ctx.lineTo(canvas.width - getRandom(0, offset), i * CELL_SIZE + getRandom(-2, 2));
-                        ctx.stroke();
-                    }
-
-                    // Draw 'O' and 'X'
-                    this.cells.forEach((value, index) => {
-                        const row = Math.floor(index / BOARD_SIZE);
-                        const col = index % BOARD_SIZE;
-                        const centerX = col * CELL_SIZE + CELL_SIZE / 2;
-                        const centerY = row * CELL_SIZE + CELL_SIZE / 2;
-                        const padding = CELL_SIZE * 0.2;
-
-                        if (value === 'O') {
-                            this.drawHandDrawnO(centerX, centerY, CELL_SIZE / 2 - padding);
-                        } else if (value === 'X') {
-                            this.drawHandDrawnX(centerX, centerY, CELL_SIZE / 2 - padding);
-                        }
-                    });
-
-                    // Highlight the hint cell
-                    if (game.hintCell !== -1) {
-                        const row = Math.floor(game.hintCell / BOARD_SIZE);
-                        const col = game.hintCell % BOARD_SIZE;
-                        ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
-                        ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                    }
-                }
-
-                // Draws a hand-drawn 'O'
-                drawHandDrawnO(x, y, radius) {
-                    const numSegments = 20;
-                    ctx.strokeStyle = O_COLOR;
-                    for (let i = 0; i < numSegments; i++) {
-                        const angleStart = (i / numSegments) * (2 * Math.PI) + getRandom(-0.1, 0.1);
-                        const angleEnd = ((i + 1) / numSegments) * (2 * Math.PI) + getRandom(-0.1, 0.1);
-                        ctx.beginPath();
-                        ctx.lineWidth = getRandom(4, 6);
-                        ctx.arc(x + getRandom(-1, 1), y + getRandom(-1, 1), radius + getRandom(-2, 2), angleStart, angleEnd);
-                        ctx.stroke();
-                    }
-                }
-
-                // Draws a hand-drawn 'X'
-                drawHandDrawnX(x, y, size) {
-                    const numSegments = 10;
-                    ctx.strokeStyle = X_COLOR;
-
-                    // First line
-                    for (let i = 0; i < numSegments; i++) {
-                        const startX = x - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const startY = y - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const endX = x - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const endY = y - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
-                        ctx.beginPath();
-                        ctx.lineWidth = getRandom(4, 6);
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
-                    
-                    // Second line
-                    for (let i = 0; i < numSegments; i++) {
-                        const startX = x + size - (i / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const startY = y - size + (i / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const endX = x + size - ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
-                        const endY = y - size + ((i + 1) / numSegments) * (2 * size) + getRandom(-2, 2);
-                        ctx.beginPath();
-                        ctx.lineWidth = getRandom(4, 6);
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
-                }
-
-                // Returns the index of the cell at a given coordinate
-                getCellIndex(x, y) {
-                    const col = Math.floor(x / CELL_SIZE);
-                    const row = Math.floor(y / CELL_SIZE);
-                    return row * BOARD_SIZE + col;
-                }
-                
-                // Checks if all cells are filled
-                isFull() {
-                    return this.cells.every(cell => cell !== null);
-                }
-
-                // Checks for a winner for a given player
-                checkWinner(player) {
-                    const lines = [
-                        // Rows
-                        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-                        // Columns
-                        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-                        // Diagonals
-                        [0, 4, 8], [2, 4, 6]
-                    ];
-                    return lines.some(line => {
-                        const [a, b, c] = line;
-                        return this.cells[a] === player && this.cells[b] === player && this.cells[c] === player;
-                    });
-                }
-
-                // Gets all available cells
-                getAvailableCells() {
-                    const available = [];
-                    for (let i = 0; i < this.cells.length; i++) {
-                        if (this.cells[i] === null) {
-                            available.push(i);
-                        }
-                    }
-                    return available;
-                }
-            }
-
-            // Main game logic
-            const game = new Game();
-
-            // Event listener for canvas click
-            canvas.addEventListener('click', (event) => {
-                if (game.isOver) {
-                    return;
-                }
-
-                const rect = canvas.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-
-                const index = game.board.getCellIndex(x, y);
-                
-                // If the cell is not taken, make a move
-                if (game.board.cells[index] === null) {
-                    game.board.cells[index] = game.currentPlayer;
-                    game.hintCell = -1; // Clear hint after move
-                    game.board.draw();
-                    game.checkWin();
-                    if (!game.isOver) {
-                        game.switchPlayer();
-                        game.updateMessage(`${game.currentPlayer} のターン`);
-                    }
-                }
-            });
-
-            // Event listener for reset button
-            resetButton.addEventListener('click', () => {
-                game.reset();
-                game.board.draw();
-            });
-
-            // Event listener for hint button
-            hintButton.addEventListener('click', () => {
-                if (game.isOver) {
-                    game.updateMessage('ゲームは終了しています');
-                    return;
-                }
-                // Only provide hint for the current player
-                game.hintCell = game.getOptimalMove(game.currentPlayer);
-                if (game.hintCell !== -1) {
-                    game.updateMessage(`最適な手はマス${game.hintCell + 1}です`);
-                    game.board.draw();
-                } else {
-                    game.updateMessage('ヒントが見つかりませんでした');
-                }
-            });
-
-            // Initial draw
-            game.board.draw();
-        });
+	  }
+      });	  
     </script>
-</body>
+  </body>
 </html>

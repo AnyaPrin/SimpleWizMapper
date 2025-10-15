@@ -1,1 +1,1 @@
-まるばつです
+Simple Wiz Mapper

@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wiz Mapper</title>
     <style>
-      
       .bg-green { background-color: #059669; } /* bg-green-600 */
       .bg-yellow { background-color: #ca8a04; } /* bg-yellow-600 */
       .bg-red { background-color: #dc2626; } /* bg-red-600 */
-      
       body {
           background: black;
           color: #f3f4f6;  
@@ -96,7 +94,7 @@
       }
       .mark-col {
           gap: 0.25rem;
-          box-shadow: 0 0 2px rgba(2, 2, 2, 1);       
+          box-shadow: 0 0 2px rgba(2, 2, 2, 1);
       }
       .col-btn {
           width: 24px;  
@@ -169,6 +167,7 @@
       }
       #name {
           display: block;
+	  position: fixed;
           font-family: impact;
           font-weight: bold;
           font-size: 20rem;
@@ -184,7 +183,6 @@
     <div id="status" class="status"></div>
     <div id="pal-con" class="pal-con" title="draggable color pal">
       <div class="btn" id="pal"></div>
-
       <div class="grip-icon"> ⠿ </div>
       <div id="col-pal"></div>
       <hr>

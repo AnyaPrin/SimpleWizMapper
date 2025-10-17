@@ -1,0 +1,9 @@
+*~
+*.*~
+sample/
+backup/
+*.bak
+*.blend
+*.xcf
+*.tmp
+

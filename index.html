@@ -222,11 +222,11 @@
 
       @keyframes spin {
 	  0% {
-              transform: rotate(0deg);
+	      transform: rotate(0deg);
 	  }
 
 	  100% {
-              transform: rotate(360deg);
+	      transform: rotate(360deg);
 	  }
       }
 
@@ -237,8 +237,8 @@
       }
 
       .menu .btn {
-      text-align: center;
-      font-size: 0.7rem;
+	  text-align: center;
+	  font-size: 0.7rem;
 	  background-color: rgba(7, 34, 59, 0.95);
 	  color: white;
 	  border: 1px solid rgba(175, 240, 390, 0.5);
@@ -287,6 +287,10 @@
 	<div class="btn" id="pip-btn">PIP(手前表示)</div>
 	<div class="btn" id="reset-view-btn">位置リセット</div>
 	<div class="btn" id="print-btn">印刷(試験的)</div>
+	<hr>
+	<div class="btn" id="export-btn">ファイルに保存</div>
+	<div class="btn" id="import-btn">ファイルから読込</div>
+	<input type="file" id="import-file-input" accept=".json" style="display: none;">
       </div>
     </div>
     <div id="loading-overlay" class="loading-overlay">
@@ -317,14 +321,13 @@
       let inPal = false;
       let isDrawing = false; // 左ドラッグで描画中かどうかのフラグ
 
-      let isSelct = false; // 矩形選択中かどうかのフラグ
+      let isSel = false; // 矩形選択中かどうかのフラグ
       let selStartIdx = null;  // 選択開始セルのインデックス
-      let clipboard = { data: null, width: 0, height: 0, topLeftIdx: null }; // コピーしたデータを保持
+      let clipboard = { data: null, memos: null, width: 0, height: 0, TLIdx: null }; // コピーしたデータを保持
       let isSelActive = false; // 矩形選択が確定しているかどうかのフラグ
       let isMovSel = false; // 選択領域を移動中かどうかのフラグ
       let mvStartIdx = null; // 移動開始時の起点セルインデックス
-      let srcTLIdx = null; // 移動する選択領域の元の左上インデックス
-      
+      let srcIdx = null; // 移動する選択領域の元の左上インデックス
       let isPanning = false; // マップをパン（移動）中かどうかのフラグ
       let panStartX = 0;
       let panStartY = 0;
@@ -348,7 +351,7 @@
               localStorage.setItem(MAP_KEY, mapString);
 	  } catch (error) {
               console.error("Local Storage save error:", error);
-              showStatus('保存中にエラーが発生しました');
+	      showStatus('保存中にエラーが発生しました');
 	  }
       };
 
@@ -435,15 +438,15 @@
 
       /**
        * 指定した位置とサイズで矩形選択のハイライトを描画する関数
-       * @param {number} topLeftIdx - 描画開始位置（左上）のインデックス
+       * @param {number} TLIdx - 描画開始位置（左上）のインデックス
        * @param {number} width - 矩形の幅
        * @param {number} height - 矩形の高さ
        */
-      const drawSelectionHighlight = (topLeftIdx, width, height) => {
+      const drawSelHighLight = (TLIdx, width, height) => {
 	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
-	  if (topLeftIdx === null) return;
-	  const startCol = topLeftIdx % GrSZ;
-	  const startRow = Math.floor(topLeftIdx / GrSZ);
+	  if (TLIdx === null) return;
+	  const startCol = TLIdx % GrSZ;
+	  const startRow = Math.floor(TLIdx / GrSZ);
 	  for (let y = 0; y < height; y++) {
               for (let x = 0; x < width; x++) {
 		  const index = (startRow + y) * GrSZ + (startCol + x);
@@ -456,7 +459,6 @@
        */
       const updateSelectionHighlight = (endIdx) => {
 	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
-	  
 	  if (selStartIdx === null || endIdx === null) return;
 	  const startCol = selStartIdx % GrSZ;
 	  const startRow = Math.floor(selStartIdx / GrSZ);
@@ -466,13 +468,13 @@
 	  const maxCol = Math.max(startCol, endCol);
 	  const minRow = Math.min(startRow, endRow);
 	  const maxRow = Math.max(startRow, endRow);
-	  drawSelectionHighlight(minRow * GrSZ + minCol, maxCol - minCol + 1, maxRow - minRow + 1);
+	  drawSelHighLight(minRow * GrSZ + minCol, maxCol - minCol + 1, maxRow - minRow + 1);
       };
 
       /**
        * 選択範囲のデータをクリップボード用変数にコピーする関数
        */
-      const copySelectedData = (endIdx) => {
+      const copySelData = (endIdx) => {
 	  if (selStartIdx === null || endIdx === null) return;
 	  const startCol = selStartIdx % GrSZ;
 	  const startRow = Math.floor(selStartIdx / GrSZ);
@@ -481,54 +483,66 @@
 	  const minCol = Math.min(startCol, endCol);
 	  const maxCol = Math.max(startCol, endCol);
 	  const minRow = Math.min(startRow, endRow);
-	  const topLeftIdx = minRow * GrSZ + minCol;
+	  const TLIdx = minRow * GrSZ + minCol;
 	  const maxRow = Math.max(startRow, endRow);
-
+	  const memos = new Map();
 	  const width = maxCol - minCol + 1;
 	  const height = maxRow - minRow + 1;
 	  const data = [];
-
 	  for (let y = 0; y < height; y++) {
               const rowData = new Uint8Array(width);
-              for (let x = 0; x < width; x++) {
+	      for (let x = 0; x < width; x++) {
 		  const index = (minRow + y) * GrSZ + (minCol + x);
 		  rowData[x] = mapState[index];
-              }
-              data.push(rowData);
+		  if (memoData.has(index)) {
+		      memos.set(index, memoData.get(index));
+		  }
+	      }
+	      data.push(rowData);		  
 	  }
-
-	  clipboard = { data, width, height, topLeftIdx };
+	  clipboard = { data, memos, width, height, TLIdx };
 	  showStatus(`${width}x${height} の範囲をコピーしました`);
 	  console.log("Copied to clipboard:", clipboard); // デバッグ用にコンソールに出力
       };
-
       /**
        * 指定した位置にクリップボードの内容を貼り付ける（ペーストする）関数
-       * @param {number} topLeftIdx - 貼り付け先の左上インデックス
+       * @param {number} TLIdx - 貼り付け先の左上インデックス
        */
-      const pasteClipboard = (topLeftIdx) => {
+      const pasteClipboard = (idx) => {
 	  if (!clipboard.data) return;
-	  const { data, width, height } = clipboard;
-	  const startCol = topLeftIdx % GrSZ;
-	  const startRow = Math.floor(topLeftIdx / GrSZ);
-	  // 移動元をクリア
-	  if (srcTLIdx !== null) {
-	      const origStartCol = srcTLIdx % GrSZ;
-	      const origStartRow = Math.floor(srcTLIdx / GrSZ);
+	  const { data, memos, width, height } = clipboard;
+	  const Col = idx % GrSZ;
+	  const Row = Math.floor(idx / GrSZ);
+	  if (srcIdx !== null) {
+	      const orgC = srcIdx % GrSZ;
+	      const orgR = Math.floor(srcIdx / GrSZ);
 	      for (let y = 0; y < height; y++) {
 		  for (let x = 0; x < width; x++) {
-		      handleCell((origStartRow + y) * GrSZ + (origStartCol + x), BsCOL);
+		      const orgId = (orgR + y) * GrSZ + (orgC + x);
+		      handleCell(orgId, BsCOL);
+		      // 移動元のメモを削除
+		      if (memoData.has(orgId)) {
+			  memoData.delete(orgId);
+			  updateMemoOnCell(orgId, null);
+		      }
 		  }
 	      }
 	  }
-	  // 貼り付け先に描画
+	  // 新しい位置にメモを移動
+	  memos.forEach((memoText, originalIndex) => {
+	      const delta = originalIndex - srcIdx;
+	      const newIndex = idx + delta;
+	      memoData.set(newIndex, memoText);
+	      updateMemoOnCell(newIndex, memoText);
+	  });
 	  for (let y = 0; y < height; y++) {
 	      for (let x = 0; x < width; x++) {
-		  const mapIndex = (startRow + y) * GrSZ + (startCol + x);
-		  handleCell(mapIndex, data[y][x]);
+		  const mapIdx = (Row + y) * GrSZ + (Col + x);
+                  handleCell(mapIdx, data[y][x]);
 	      }
 	  }
 	  saveMap();
+	  saveMemos();
 	  showStatus(`${width}x${height} の範囲を移動しました`);
       };
       
@@ -540,9 +554,8 @@
 	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
 	  isSelActive = false;
 	  selStartIdx = null;
-	  clipboard = { data: null, width: 0, height: 0, topLeftIdx: null };
+          clipboard = { data: null, memos: null, width: 0, height: 0, TLIdx: null };
       };
-
       const loadMemos = () => {
 	  const memoString = localStorage.getItem(MEMO_KEY);
 	  if (memoString) {
@@ -568,8 +581,9 @@
 	  loadMemos();
 	  renderGrid();
 	  document.getElementById('loading-overlay').classList.add('is-hidden');
+	  
       };
-
+      
       mapCon.addEventListener('mousedown', (e) => {
 	  const cell = e.target.closest('.cell');
 
@@ -619,7 +633,7 @@
 
 		  // 移動元の左上インデックスを計算して保持
 		  const selectedCells = document.querySelectorAll('.cell.selecting');
-		  srcTLIdx = Array.from(selectedCells).reduce((min, c) => Math.min(min, parseInt(c.dataset.idx, 10)), Infinity);
+		  srcIdx = Array.from(selectedCells).reduce((min, c) => Math.min(min, parseInt(c.dataset.idx, 10)), Infinity);
 		  selectedCells.forEach(c => c.classList.add('grabbing'));
 
               } else {
@@ -632,7 +646,7 @@
               e.preventDefault();
               // 既存の選択をクリアして新しい選択を開始
               clearSelection();
-              isSelct = true;
+              isSel = true;
               document.body.classList.add('is-selecting-rect');
               isSelActive = true;
               selStartIdx = parseInt(cell.dataset.idx, 10);
@@ -669,19 +683,19 @@
 	  }
 
 
-	  if (isSelct) { // 矩形選択中のハイライト更新
-              const currentIdx = parseInt(cell.dataset.idx, 10);
-              updateSelectionHighlight(currentIdx);
+	  if (isSel) { // 矩形選択中のハイライト更新
+              const i = parseInt(cell.dataset.idx, 10);
+              updateSelectionHighlight(i);
 	  } else if (isMovSel) { // 選択領域の移動中のハイライト更新
-	      const currentIdx = parseInt(cell.dataset.idx, 10);
-	      const startRow = Math.floor(mvStartIdx / GrSZ);
-	      const startCol = mvStartIdx % GrSZ;
-	      const currentRow = Math.floor(currentIdx / GrSZ);
-	      const currentCol = currentIdx % GrSZ;
-	      const deltaRow = currentRow - startRow;
-	      const deltaCol = currentCol - startCol;
-	      const newTL = srcTLIdx + deltaRow * GrSZ + deltaCol;
-	      drawSelectionHighlight(newTL, clipboard.width, clipboard.height);
+	      const i = parseInt(cell.dataset.idx, 10);
+	      const sRow = Math.floor(mvStartIdx / GrSZ);
+	      const sCol = mvStartIdx % GrSZ;
+	      const row = Math.floor(i / GrSZ);
+	      const col = i % GrSZ;
+	      const dRow = row - sRow;
+	      const dCol = col - sCol;
+	      const newTL = srcIdx + dRow * GrSZ + dCol;
+	      drawSelHighLight(newTL, clipboard.width, clipboard.height);
 	  }
       });
 
@@ -702,34 +716,34 @@
 	  if (isMovSel) {
 	      const cell = e.target.closest('.cell');
 	      if (cell) {
-		  const endIdx = parseInt(cell.dataset.idx, 10);
-		  const startRow = Math.floor(mvStartIdx / GrSZ);
-		  const startCol = mvStartIdx % GrSZ;
-		  const endRow = Math.floor(endIdx / GrSZ);
-		  const endCol = endIdx % GrSZ;
-		  const deltaRow = endRow - startRow;
-		  const deltaCol = endCol - startCol;
-		  const pasteTLIdx = srcTLIdx + deltaRow * GrSZ + deltaCol;
-
-		  pasteClipboard(pasteTLIdx); // 貼り付けを実行
+		  const eIdx = parseInt(cell.dataset.idx, 10);
+		  const sRow = Math.floor(mvStartIdx / GrSZ);
+		  const sCol = mvStartIdx % GrSZ;
+		  const eRow = Math.floor(eIdx / GrSZ);
+		  const eCol = eIdx % GrSZ;
+		  const dRow = eRow - sRow;
+		  const dCol = eCol - sCol;
+		  const pasteIdx = srcIdx + dRow * GrSZ + dCol;
+		  pasteClipboard(pasteIdx); // 貼り付けを実行
 		  clearSelection(); // 選択範囲とクリップボードをクリア
 	      }
 	      isMovSel = false;
 	      mvStartIdx = null;
-	      srcTLIdx = null; // 移動元の情報をクリア
+	      srcIdx = null; // 移動元の情報をクリア
 	  }
 	  document.querySelectorAll('.cell.grabbing').forEach(c => c.classList.remove('grabbing'));
 	  inPal = false;
-	  if (isSelct && e.button === 2) {          // 矩形選択の終了処理
+	  if (isSel && e.button === 2) {          // 矩形選択の終了処理
 	      const cell = e.target.closest('.cell');
 	      if (cell) {
 		  const endIdx = parseInt(cell.dataset.idx, 10);
-		  copySelectedData(endIdx);
+		  copySelData(endIdx);
 	      }
-	      isSelct = false;
+	      isSel = false;
 	      document.body.classList.remove('is-selecting-rect');
 	  }
       };
+      
       const handleMouseMove = (e) => {
 	  // パン操作中のマップ移動
 	  if (isPanning) {
@@ -794,11 +808,13 @@
       });
 
       clrMap.addEventListener('click', () => {
-	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
+	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップとメモを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
               mapState.fill(BsCOL);
+	      memoData.clear();
               renderGrid();
               saveMap(); 
-              showStatus('マップをリセットしました');
+	      saveMemos();
+              showStatus('マップとメモをリセットしました');
 	  }
       });
 
@@ -830,19 +846,75 @@
 
       // 選択領域クリアボタンの処理
       document.getElementById('clr-sel').addEventListener('click', () => {
-	  if (clipboard.topLeftIdx !== null) { // 選択範囲がある場合のみ実行
-	      const { topLeftIdx, width, height } = clipboard;
-	      const startCol = topLeftIdx % GrSZ;
-	      const startRow = Math.floor(topLeftIdx / GrSZ);
+	  if (clipboard.TLIdx !== null) { // 選択範囲がある場合のみ実行
+	      const { TLIdx, width, height } = clipboard;
+	      const sCol = TLIdx % GrSZ;
+	      const sRow = Math.floor(TLIdx / GrSZ);
 	      for (let y = 0; y < height; y++) {
 		  for (let x = 0; x < width; x++) {
-		      handleCell((startRow + y) * GrSZ + (startCol + x), BsCOL);
+		      handleCell((sRow + y) * GrSZ + (sCol + x), BsCOL);
 		  }
 	      }
 	      saveMap();
 	      clearSelection();
 	  }
       });
+
+      // --- エクスポート/インポート機能 ---
+      const exportBtn = document.getElementById('export-btn');
+      exportBtn.addEventListener('click', () => {
+	  const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+	  const defaultFilename = `wiz-mapper-data_${timestamp}.json`;
+	  const filename = prompt('ファイル名を入力してください:', defaultFilename);
+
+	  if (filename) {
+	      try {
+		  const dataToExport = {
+		      mapData: Array.from(mapState),
+		      memoData: Array.from(memoData.entries()),
+		  };
+		  const jsonString = JSON.stringify(dataToExport, null, 2);
+		  const blob = new Blob([jsonString], { type: 'application/json' });
+		  const url = URL.createObjectURL(blob);
+		  const a = document.createElement('a');
+		  a.href = url;
+		  a.download = filename.endsWith('.json') ? filename : `${filename}.json`;
+		  document.body.appendChild(a);
+		  a.click();
+		  document.body.removeChild(a);
+		  URL.revokeObjectURL(url);
+		  showStatus('データをファイルに保存しました');
+	      } catch (error) {
+		  console.error("Export failed:", error);
+		  showStatus('エクスポート中にエラーが発生しました');
+	      }
+	  }
+      });
+
+      const importBtn = document.getElementById('import-btn');
+      const importFileInput = document.getElementById('import-file-input');
+      importBtn.addEventListener('click', () => importFileInput.click());
+      importFileInput.addEventListener('change', (event) => {
+	  const file = event.target.files[0];
+	  if (!file) return;
+	  const reader = new FileReader();
+	  reader.onload = (e) => {
+	      try {
+		  const data = JSON.parse(e.target.result);
+		  if (data.mapData && data.mapData.length === GrSZ * GrSZ && data.memoData) {
+		      mapState = new Uint8Array(data.mapData);
+		      memoData = new Map(data.memoData);
+		      renderGrid();
+		      saveMap();
+		      saveMemos();
+		      showStatus('ファイルからデータを読み込みました');
+		  } else { throw new Error('Invalid data format'); }
+	      } catch (error) { showStatus('ファイルの読み込みに失敗しました'); }
+	  };
+	  reader.readAsText(file);
+	  importFileInput.value = ''; // 同じファイルを再度選択できるようにリセット
+      });
+
       (() => {
 	  createPal();
 	  loadMap();

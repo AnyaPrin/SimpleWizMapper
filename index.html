@@ -154,7 +154,14 @@
       }
 
       .select-col {
-	  box-shadow: 0 0 2px #f00;
+	  transform: scale(0.9); /* 少し小さくして押された感を出す */
+	  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6); /* 内側に影を付けて押し込みを表現 */
+      }
+
+      /* 選択中のボタンはホバーしても拡大しないようにする */
+      .select-col:hover {
+	  transform: scale(0.9);
+	  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
       }
 
       .is-hidden {
@@ -247,9 +254,9 @@
       <div id="col-pal"></div>
       <hr>
       <div class="menu">
-	<div class="btn" id="clr-sel">選択領域をクリア</div>
-	<div class="btn" id="clr-map">ワイプ</div>
-	<div class="btn" id="pip-btn">常に手前に表示</div>
+	<div class="btn" id="clr-sel">選択領域クリア</div>
+	<div class="btn" id="clr-map">オールワイプ</div>
+	<div class="btn" id="pip-btn">PIP(手前に表示)</div>
 	<div class="btn" id="reset-view-btn">位置リセット</div>
 	<div class="btn" id="print-btn">印刷(試験的)</div>
       </div>
@@ -293,19 +300,6 @@
       let iniTrns = { x: 0, y: 0 };
 
       const clrMap = document.getElementById('clr-map');
-
-      /**
-       * マップ上のカーソルを選択色で更新する
-       * @param {string} color - CSSの色文字列 (e.g., '#FF0000')
-       */
-      const updateCursor = (color) => {
-	  // 16x16のSVGカーソルを作成。中央がホットスポット。
-	  const svg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7" fill="${color}" stroke="black" stroke-width="1.5"/><circle cx="8" cy="8" r="7" fill="${color}" stroke="white" stroke-width="0.5"/></svg>`;
-	  const cursorUrl = `url('data:image/svg+xml;base64,${btoa(svg)}')`;
-	  // ホットスポットをSVGの中央(8,8)に設定し、pointerをフォールバックとして指定
-	  mapCon.style.cursor = `${cursorUrl} 8 8, pointer`;
-      };
-
 
 
       const showStatus = (message) => {
@@ -382,7 +376,6 @@
 		  document.querySelector('.select-col')?.classList.remove('select-col');
 		  selCol = i;
 		  b.classList.add('select-col');
-		  updateCursor(COL_MAP[selCol]);
               });
               markerColorsDiv.appendChild(b);
 	  });
@@ -573,7 +566,7 @@
 	      // isPanningがtrueでも、ボタンが離されている場合があるためチェック
 	      if (e.buttons !== 4 && e.buttons !== 3) { // 4=中ボタン, 3=左右ボタン
 		  isPanning = false;
-		  updateCursor(COL_MAP[selCol]);
+		  mapCon.style.cursor = '';
 	      }
 	  }
 	  const cell = e.target.closest('.cell');
@@ -606,7 +599,7 @@
 	  }
 	  if (isPanning) {
 	      isPanning = false;
-	      updateCursor(COL_MAP[selCol]);
+	      mapCon.style.cursor = '';
 	  }
 	  if (isDrawing) {
 	      isDrawing = false;
@@ -754,7 +747,6 @@
       (() => {
 	  createPal();
 	  loadMap();
-	  updateCursor(COL_MAP[selCol]); // 初期カーソルを設定
       })();
 
       // ブラウザの右クリックメニューを無効化

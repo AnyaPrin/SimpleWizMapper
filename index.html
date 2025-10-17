@@ -3,134 +3,126 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Mapper</title>
+    <title>Wiz Mapper</title>
     <style>
-      body {
-          background-color: #111817; 
-          color: #f3f4f6; 
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-          font-family: sans-serif;
-	  width:90%;
-      }
-      p {
-          font-size: 0.7rem;
-      }
-      .map-grid {
-          display: grid;
-          grid-template-columns: repeat(100, 1fr);
-          width: 100%;
-          height: 100%;
-          border: 1px solid #448;
-          box-shadow: 0 0 10px rgba(0, 0, 58, 0.5);
-      }
-      .cell {
-	  width: 20px;
-	  height: 20px;
-	  background-color: black;
-	  cursor: pointer;
-	  transition: border-color 0.1s ease-out;
-	  border: 1px dotted rgba(55, 55, 155, 0.5);
-	  box-sizing: border-box; 
-      }
-      .cell.grid-line-col { border-right: 1px solid #228; }
-      .cell.grid-line-row { border-bottom: 1px solid #228;}
-      .cell.explored { border: 1px dotted #228;}
-      .cell.explored.grid-line-col { border-right: 1px solid #444; }
-      .cell.explored.grid-line-row { border-bottom: 1px solid #444;}
-      
-      .status-message {
-          margin-top: 0rem;
-	  height:0.3rem;
-          padding: 0.2rem;
-          font-size: 0.5rem;
-          border-radius: 0.25rem; 
-          transition: opacity 0.3s;
-          opacity: 0;
-          user-select: none;
-      }
       
       .bg-green { background-color: #059669; } /* bg-green-600 */
       .bg-yellow { background-color: #ca8a04; } /* bg-yellow-600 */
       .bg-red { background-color: #dc2626; } /* bg-red-600 */
+      
+      body {
+          background: black;
+          color: #f3f4f6;  
+          flex-direction: column;
+          min-height: 100vh;
+          font-family: sans-serif;
+          width:100vw;
+          height:100vh;
+          min-width:600px;
+          min-height:400px;
+          padding:0px;
+          margin:0px;
+          overflow: hidden; /* 念のためスクロールバーを非表示に */
+      }
+      p {
+          font-size: 0.7rem;
+      }
+      #map-con {
+          background: transparent;
+          padding:0px;
+          margin:0px;      
+          display: grid;
+          grid-template-columns: repeat(100, 1fr);
+      }
+      .cell {
+          background: none;
+          color: none;
+          width: 24px;
+          height: 24px;
+          cursor: pointer;
+          transition: border-color 0.1s ease-out;
+          border: 1px dotted rgba(55, 55, 155, 0.5);
+          box-sizing: border-box;  
+      }
+      .cell.grid-line-col { border-right: 1px solid #448; }
+      .cell.grid-line-row { border-bottom: 1px solid #448;}
+      .cell.explored { border: 1px dotted #484;}
+      
+      .cell.explored.grid-line-col { border-right: 1px solid #444; }
+      .cell.explored.grid-line-row { border-bottom: 1px solid #444;}
+      .cell.selecting {
+          background-color: rgba(0, 170, 255, 0.1) !important;
+          outline: 1px solid rgba(0, 220, 255, 0.1) !important;
+	  z-index: 999;
+      }
 
+      .status {
+          display:block;
+	  align:center;
+          height:1.2rem;
+          font-size: 1rem;
+          border-radius: 0.25rem;  
+          transition: opacity 0.3s;
+          opacity: 0;
+          user-select: none;
+      }
       .pal-con {
-	  --left: calc(100% - 2rem - 100px); /* 初期位置: right 2rem */
-	  --top: 2vh;	  
           position: fixed;
-	  left: var(--left);
-          top: var(--top);
+          left:2vh;
+          top: 2vh;
           padding: 1.5rem 0.5rem 0.5rem;
-          background-color: rgba(31, 41, 55, 0.7); /* bg-gray-800 bg-opacity-70 */
+          background-color: rgba(155, 155, 155, 0.1);
+          backdrop-filter: blur(2px);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
           border-radius: 0.5rem; /* rounded-lg */
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2); /* shadow-xl */
+          border: 1px solid rgba(155, 155, 155, 1);
           flex-shrink: 0;
-	  width:100px;
+          width:120px;
           z-index: 50;
           cursor: grab;
           transition: box-shadow 0.1s;
-	  cursor: grab;
       }
       .pal-con.grabbing {
           cursor: grabbing;
       }
       .grip-icon {
           position: absolute;
-          top: 0rem; 
+          top: 0rem;  
           right: 0.5rem;
           padding: 0rem;
           color: #9ca3af;
-          opacity: 0.8; 
+          opacity: 0.8;  
           pointer-events: none;
       }
       .mark-col {
           gap: 0.25rem;
-          box-shadow: 0 0 2px rgba(2, 2, 2, 1);	  
+          box-shadow: 0 0 2px rgba(2, 2, 2, 1);       
       }
       .col-btn {
-          width: 20px; 
-          height: 20px;
-	  margin:1px;
+          width: 24px;  
+          height: 24px;
+          margin:1px;
           border-radius: 0.2rem;
           transition: transform 0.1s, box-shadow 0.1s;
-	  cursor: pointer;
+          cursor: pointer;
       }
       .col-btn:hover {
           transform: scale(1.1);
           box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
       }
+
       .select-col {
-          box-shadow: 0 0 2px rgba(2, 2, 2, 1);
-      }
-      
-      .btn {
-	  text-align: center;
-          background-color: rgba(7, 34, 59, 0.95);
-	  color:white;
-          border-radius: 4px;
-	  border: 1px solid rgba(175, 240, 390, 0.5);
-	  font-size: 0.8rem;
-	  transition: background-color 0.2s;
-	  width: 14%;
-	  margin:10px;
-      }
-      .btn:hover {
-          background-color: rgba(175, 240, 390, 0.95);
-	  color:black;
-	  box-shadow: 0 4px 12px rgba(143, 143, 143, 0.7);	  
-	  cursor:pointer;
+          box-shadow: 0 0 2px #f00;
       }
       
       .is-hidden {
           opacity: 0;
-          pointer-events: none; 
+          pointer-events: none;  
       }
-      
       .loading-overlay {
           position: absolute;
           inset: 0;
-          background-color: rgba(17, 24, 39, 0.95); 
+          background-color: black;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -149,247 +141,309 @@
           height: 40px;
           animation: spin 1s linear infinite;
       }
-
       @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
       }
       .menu {
-	  display:flex;
-	  flex-direction:row;
+          display:flex;
+          flex-direction:column;
+          font-size: 0.8rem;      
       }
-      
+      .menu .btn {
+          text-align: center;
+          background-color: rgba(7, 34, 59, 0.95);
+          color:white;
+          border: 1px solid rgba(175, 240, 390, 0.5);
+          transition: background-color 0.2s;
+          width: 95%;
+          height: 20px;
+          margin: 2px;
+          border-radius: 6px;
+      }
+      .btn:hover {
+          background-color: rgba(175, 240, 390, 0.5);
+          color:black;
+          box-shadow: 0 4px 12px rgba(143, 143, 143, 0.7);      
+          cursor:pointer;
+      }
+      #name {
+          display: block;
+          font-family: impact;
+          font-weight: bold;
+          font-size: 20rem;
+          color: #111;
+          top:3px;
+          z-index: -9999;
+      }
     </style>
   </head>
   <body>
-    <strong>Simple Wiz Mapper </strong>    
-    <div class="menu">    
-      <div class="btn" id="pal">Color Pallete</div>      
-      <div class="btn" id="clr-map">All Clear</div>
-      <div class="btn" id="save">Print</div>
-      <div class="btn" id="menu1">menu1</div>
-      <div class="btn" id="menu2">menu2</div>
-      <div class="btn" id="menu3">menu3</div>                  
-    </div>
-    
-    <div id="status-message" class="status-message"></div>
-    <div id="map-con" class="map-grid"></div>
+    <div id="name">Wiz Mapper</div>
+    <div id="map-con"></div>
+    <div id="status" class="status"></div>
     <div id="pal-con" class="pal-con" title="draggable color pal">
-      <div class="grip-icon"> ⠿  </div>
+      <div class="btn" id="pal"></div>
+
+      <div class="grip-icon"> ⠿ </div>
       <div id="col-pal"></div>
+      <hr>
+      <div class="menu">    
+        <div class="btn" id="clr-map">All Clear</div>
+        <div class="btn" id="menu1">menu1</div>
+        <div class="btn" id="menu2">menu2</div>
+        <div class="btn" id="menu3">menu3</div>              
+      </div>
     </div>
-    
+
     <div id="loading-overlay" class="loading-overlay">
       <div class="spinner"></div>
       <p class="loading-text">Loading...</p>
     </div>
 
     <script type="module">
-      const PAL_COLORS = [
-          '#FFFFFF', // 0: White 
-          '#FF0000', // 1: Red 
-          '#00FF00', // 2: Green
-          '#0000FF', // 3: Blue
-          '#FFFF00', // 4: Yellow
-          '#FF00FF', // 5: Magenta
-          '#00FFFF', // 6: Cyan
-          '#FFA500', // 7: Orange
-          '#800080', // 8: Purple
-          '#008000', // 9: Dark Green
-          '#800000', // 10: Maroon
-          '#40E0D0', // 11: Turquoise
-          '#FFC0CB', // 12: Pink
-          '#A52A2A', // 13: Brown
-          '#808080', // 14: Gray
-          '#000000'  // 15: Black
+      const PAL = [
+          '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+          '#FFA500', '#800080', '#008000', '#800000', '#40E0D0', '#FFC0CB', '#A52A2A',
+          '#808080', '#000000'
       ];
-      const COLOR_MAP = PAL_COLORS.reduce((a, c, i) => {
-          a[i] = c;
-          return a;
-      }, {});
-      const GRID_SIZE = 100;
-      const MAP_KEY = 'simple_wiz_mapper';
-      let mapState = new Uint8Array(GRID_SIZE * GRID_SIZE).fill(15); // mapState: 10,000マス分を保持する配列 
+      const BsCOL = 15; // base color index 
+      const COL_MAP = PAL.reduce((a, c, i) => { a[i] = c; return a; }, {});
+      const GrSZ = 100; // grid size
+      const MAP_KEY = 'wiz_mapper';
+      let mapState = new Uint8Array(GrSZ * GrSZ).fill(BsCOL);
       let mapCon = document.getElementById('map-con');
-      let statusMessage = document.getElementById('status-message');
-      let selCol = 0;        // default is white
+      let status = document.getElementById('status');
+      let selCol = 0;
       const palCon = document.getElementById('pal-con');
       let isDrag = false;
       let dragOffX = 0;
       let dragOffY = 0;
-      let inPal = false; // パレット操作中かどうかを判定するためのフラグ
+      let inPal = false;
+
+      let isSelecting = false; // 矩形選択中かどうかのフラグ
+      let selStartIdx = null;  // 選択開始セルのインデックス
+      let clipboard = { data: null, width: 0, height: 0 }; // コピーしたデータを保持
+
+      const clrMap = document.getElementById('clr-map');
       
-      /**
-       * ステータスメッセージを表示し、一定時間後に消す
-       */
-      const showStatus = (message, bgColorClass) => {
-          statusMessage.textContent = message;
-          statusMessage.className = `status-message transition-opacity opacity-100 bg-${bgColorClass}`;
+      const showStatus = (message) => {
+          status.textContent = message;
+          status.className = `status`;
+          status.style.opacity = 1;
           setTimeout(() => {
-              statusMessage.classList.remove('opacity-100');
-              statusMessage.classList.add('opacity-0');
+              status.style.opacity = 0;
           }, 2000);
       };
 
-      /**
-       * マップの状態をLocal Storageに保存する
-       */
       const saveMap = () => {
-          try {             // Uint8Arrayを1桁HEX文字列に変換（10,000文字）
+          try {
               const mapString = Array.from(mapState).map(v => v.toString(16)).join('');
               localStorage.setItem(MAP_KEY, mapString);
           } catch (error) {
               console.error("Local Storage save error:", error);
-              showStatus('保存エラーが発生しました', 'red');
+              showStatus('保存中にエラーが発生しました');
+          }
+      };
+
+      const renderGrid = () => {
+          if (mapCon.children.length === 0) {
+              mapCon.innerHTML = '';
+              for (let i = 0; i < GrSZ * GrSZ; i++) { 
+                  const cell = document.createElement('div');
+                  cell.classList.add('cell');
+                  cell.dataset.idx = i;
+                  const col = i % GrSZ;
+                  if (col % 10 === 9 && col < GrSZ - 1) {
+                      cell.classList.add('grid-line-col');
+                  }
+                  const row = Math.floor(i / GrSZ);
+                  if (row % 10 === 9 && row < GrSZ - 1) {
+                      cell.classList.add('grid-line-row');
+                  }
+                  mapCon.appendChild(cell);
+              }
+          }
+          for (let i = 0; i < GrSZ * GrSZ; i++) {
+              const cell = mapCon.children[i];
+              const c = mapState[i];
+              cell.style.backgroundColor = COL_MAP[c];
+              if (c !== BsCOL) {
+                  cell.classList.add('explored');
+              } else {
+		  cell.classList.remove('explored');
+              }
+          }
+      };
+
+      const handleCell = (i) => {
+          mapState[i] = mapState[i] === BsCOL ? selCol : BsCOL;
+          const cell = mapCon.children[i];
+          cell.style.backgroundColor = COL_MAP[mapState[i]];
+          cell.classList.toggle('explored', mapState[i] !== BsCOL);
+          saveMap();
+      };
+
+      const createPal = () => {
+          const palDiv = document.getElementById('col-pal');
+          palDiv.innerHTML = `<div id="mark-col" class="mark-col-grid"></div>`;
+          const markerColorsDiv = document.getElementById('mark-col');
+          PAL.forEach((c, i) => {
+              const b = document.createElement('button');
+              b.classList.add('col-btn');
+              b.style.backgroundColor = c;
+              b.dataset.colorIdx = i;
+	      
+              if (i === selCol)
+		  b.classList.add('select-col');
+
+              b.addEventListener('click', () => {
+                  inPal = true;
+                  document.querySelector('.select-col')?.classList.remove('select-col');
+                  selCol = i;
+                  b.classList.add('select-col');
+              });
+              markerColorsDiv.appendChild(b);
+          });
+      };
+      
+      /**
+       * 矩形選択のハイライトを更新する関数
+       */
+      const updateSelectionHighlight = (endIdx) => {
+          document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
+          if (selStartIdx === null || endIdx === null) return;
+          const startCol = selStartIdx % GrSZ;
+          const startRow = Math.floor(selStartIdx / GrSZ);
+          const endCol = endIdx % GrSZ;
+          const endRow = Math.floor(endIdx / GrSZ);
+          const minCol = Math.min(startCol, endCol);
+          const maxCol = Math.max(startCol, endCol);
+          const minRow = Math.min(startRow, endRow);
+          const maxRow = Math.max(startRow, endRow);
+          for (let row = minRow; row <= maxRow; row++) {
+              for (let col = minCol; col <= maxCol; col++) {
+		  const index = row * GrSZ + col;
+		  mapCon.children[index]?.classList.add('selecting');
+              }
           }
       };
 
       /**
-       * グリッドUIを現在のmapStateに基づいて描画または更新する
+       * 選択範囲のデータをクリップボード用変数にコピーする関数
        */
-      const renderGrid = () => {
-	  if (mapCon.children.length === 0) {
-              mapCon.innerHTML = '';
-              for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-		  const cell = document.createElement('div');
-		  cell.classList.add('cell');
-		  cell.dataset.idx = i;
-		  const col = i % GRID_SIZE; // 列番号 (0-99)
-		  if (col % 10 === 9 && col < GRID_SIZE - 1) { // 10, 20, ..., 90列目（最後の列は除く）
-                      cell.classList.add('grid-line-col');
-		  }
-		  const row = Math.floor(i / GRID_SIZE); // 行番号 (0-99)
-		  if (row % 10 === 9 && row < GRID_SIZE - 1) { // 10, 20, ..., 90行目（最後の行は除く）
-                      cell.classList.add('grid-line-row');
-		  }
-		  mapCon.appendChild(cell);
-              }
-	  }
-	  for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-              const cell = mapCon.children[i];
-              const colorIdx = mapState[i];
-              if (colorIdx !== 15) {
-		  cell.classList.add('explored');
-		  cell.style.backgroundColor = COLOR_MAP[colorIdx];
-              } else {
-		  cell.classList.remove('explored');
-		  cell.style.backgroundColor = '#111';
-              }
-	  }
-      };      
+      const copySelectedData = (endIdx) => {
+          if (selStartIdx === null || endIdx === null) return;
+          const startCol = selStartIdx % GrSZ;
+          const startRow = Math.floor(selStartIdx / GrSZ);
+          const endCol = endIdx % GrSZ;
+          const endRow = Math.floor(endIdx / GrSZ);
+          const minCol = Math.min(startCol, endCol);
+          const maxCol = Math.max(startCol, endCol);
+          const minRow = Math.min(startRow, endRow);
+          const maxRow = Math.max(startRow, endRow);
 
-      /**
-       * マス目のクリックイベントハンドラ
-       */
-      const handleCell = (i, r) => {
-          const c = mapState[i];
-          if (r) {          // Right click
-              mapState[i] = 15;
-	      console.log('color',c);	      
-              renderGrid();
-              saveMap();
-          } else {          // left click
-	      mapState[i] = selCol;
-              renderGrid();
-              saveMap();
-	  }
+          const width = maxCol - minCol + 1;
+          const height = maxRow - minRow + 1;
+          const data = [];
+
+          for (let y = 0; y < height; y++) {
+              const rowData = new Uint8Array(width);
+              for (let x = 0; x < width; x++) {
+                  const index = (minRow + y) * GrSZ + (minCol + x);
+                  rowData[x] = mapState[index];
+              }
+              data.push(rowData);
+          }
+
+          clipboard = { data, width, height };
+          showStatus(`${width}x${height} の範囲をコピーしました`);
+          console.log("Copied to clipboard:", clipboard); // デバッグ用にコンソールに出力
       };
 
-      /**
-       * Local Storageからマップの状態をロードする
-       */
       const loadMap = () => {
           const mapString = localStorage.getItem(MAP_KEY);
-          if (mapString && mapString.length === GRID_SIZE * GRID_SIZE ) {
-              for (let i = 0; i < mapState.length; i++) {      
+          if (mapString && mapString.length === GrSZ * GrSZ) {
+              for (let i = 0; i < mapState.length; i++) {
                   mapState[i] = parseInt(mapString[i], 16);
               }
-              showStatus('マップをローカルからロードしました', 'green');
+              showStatus('Loaded Map form Your Browser(Local Strage ).', MAP_KEY);
           } else {
-              showStatus('新規マップを作成しました', 'yellow');
-              mapState.fill(15);
+              showStatus('Created New map.');
+	      mapState.fill(BsCOL);
           }
           renderGrid();
           document.getElementById('loading-overlay').classList.add('is-hidden');
       };
 
-      
-
-      /**
-       * カラーパレット生成
-       */
-      const createPal = () => {
-          const palDiv = document.getElementById('col-pal');
-          palDiv.innerHTML = `<div id="mark-col" class="mark-col-grid"></div>`;
-          const markerColorsDiv = document.getElementById('mark-col');
-          PAL_COLORS.forEach((c, i) => {
-              const b = document.createElement('button');
-              b.classList.add('col-btn');
-              b.style.backgroundColor = c;
-              b.dataset.colorIdx = i;
-              let targetDiv;
-              targetDiv = markerColorsDiv;
-              if (i === selCol) {
-                  b.classList.add('select-col');
-              }
-              b.addEventListener('click', () => {
-                  inPal = true;
-                  document.querySelectorAll('.select-col').forEach(btn => {
-                      btn.classList.remove('select-col');
-                  });
-                  selCol = i;
-                  b.classList.add('select-col');
-              });
-              targetDiv.appendChild(b);
-          });
-      };
-      
-      (() => {
-          createPal();
-          loadMap(); // load from browser Local Storage
-      })();
-
-      mapCon.addEventListener('click', (e) => {
+      mapCon.addEventListener('mousedown', (e) => {
           const cell = e.target.closest('.cell');
-          if (cell) {
-              const i = parseInt(cell.dataset.idx);
-              handleCell(i, false); // left click
+          if (!cell || inPal) return;
+
+          if (e.button === 0) { // 左クリック
+              const i = parseInt(cell.dataset.idx, 10);
+              handleCell(i);
+          } else if (e.button === 2) { // 右クリック
+              e.preventDefault();
+              isSelecting = true;
+              selStartIdx = parseInt(cell.dataset.idx, 10);
+              updateSelectionHighlight(selStartIdx);
           }
       });
 
-      mapCon.addEventListener('contextmenu', (e) => {
+      mapCon.addEventListener('mouseover', (e) => {
+          if (!isSelecting) return;
           const cell = e.target.closest('.cell');
           if (cell) {
-              e.preventDefault(); // ブラウザのコンテキストメニューを無効化
-              const i = parseInt(cell.dataset.idx);
-              if(mapState[i] !== 15) {
-                  handleCell(i, true); // 右クリックとして処理
+              const currentIdx = parseInt(cell.dataset.idx, 10);
+              updateSelectionHighlight(currentIdx);
+          }
+      });
+      
+      document.addEventListener('mouseup', (e) => {
+          if (isDrag) {
+              isDrag = false;
+              palCon.classList.remove('grabbing');
+          }
+          inPal = false;
+          if (isSelecting && e.button === 2) {          // 矩形選択の終了処理
+              const cell = e.target.closest('.cell');
+              if (cell) {
+		  const endIdx = parseInt(cell.dataset.idx, 10);
+		  copySelectedData(endIdx);
               }
+              // ハイライトを解除
+//              document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
+              isSelecting = false;
+              selStartIdx = null;
+          }
+      });
+
+      clrMap.addEventListener('click', () => {
+	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
+              mapState.fill(BsCOL);
+              renderGrid();
+              saveMap();
+              showStatus('マップをリセットしました');
           }
       });
 
       palCon.addEventListener('mousedown', (e) => {
-	  if (e.target.closest('button')) {
-	      inPal = true; 
+          if (e.target.closest('button')) {
+              inPal = true;
               e.stopPropagation();
               return;
-	  }
+          }
           isDrag = true;
           palCon.classList.add('grabbing');
           const rect = palCon.getBoundingClientRect();
-	  console.log('Dragging ', rect.left, rect.top);
           dragOffX = e.clientX - rect.left;
           dragOffY = e.clientY - rect.top;
-          palCon.style.top = `${rect.top}px`;
-          palCon.style.left = `${rect.left}px`;
-          palCon.style.position = 'fixed'; 
-          e.preventDefault(); // avoid text selection
-	  e.stopPropagation();
+          e.preventDefault();
       });
 
       document.addEventListener('mousemove', (e) => {
           if (!isDrag) return;
-	  // console.log('mousemove',e.clientX, e.clientY);
           let newX = e.clientX - dragOffX;
           let newY = e.clientY - dragOffY;
           const maxX = window.innerWidth - palCon.offsetWidth;
@@ -401,37 +455,25 @@
       });
       
       window.addEventListener('resize', () => {
-	  const rect = palCon.getBoundingClientRect();
-	  let newX = rect.left;
-	  let newY = rect.top;
-	  const maxX = window.innerWidth - palCon.offsetWidth;
-	  const maxY = window.innerHeight - palCon.offsetHeight;
-	  newX = Math.max(0, Math.min(newX, maxX));
-	  newY = Math.max(0, Math.min(newY, maxY));
-	  palCon.style.left = `${newX}px`;
-	  palCon.style.top = `${newY}px`;
+          const rect = palCon.getBoundingClientRect();
+          let newX = rect.left;
+          let newY = rect.top;
+          const maxX = window.innerWidth - palCon.offsetWidth;
+          const maxY = window.innerHeight - palCon.offsetHeight;
+          newX = Math.max(0, Math.min(newX, maxX));
+          newY = Math.max(0, Math.min(newY, maxY));
+          palCon.style.left = `${newX}px`;
+          palCon.style.top = `${newY}px`;
       });
       
-      document.addEventListener('mouseup', () => {
-          if (isDrag) {
-	      console.log('mouseup, drag stopped');
-              isDrag = false;
-              palCon.classList.remove('grabbing');
-          }
-	  inPal=false;
-      });
+      (() => {
+          createPal();
+          loadMap();
+      })();
 
-      // リセットボタン
-      const clrMap = document.getElementById('clr-map');
-      clrMap.addEventListener('click', () => {
-	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
-              mapState.fill(15);
-              renderGrid();
-              saveMap();
-              showStatus('マップをリセットしました', 'yellow');
+      // ブラウザの右クリックメニューを無効化
+      mapCon.addEventListener('contextmenu', (e) => e.preventDefault());
 
-	  }
-      });	  
     </script>
   </body>
 </html>

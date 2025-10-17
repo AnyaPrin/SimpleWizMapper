@@ -1,210 +1,268 @@
 <!DOCTYPE html>
 <html lang="ja">
+
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wiz Mapper</title>
+
     <style>
-      .bg-green { background-color: #059669; } /* bg-green-600 */
-      .bg-yellow { background-color: #ca8a04; } /* bg-yellow-600 */
-      .bg-red { background-color: #dc2626; } /* bg-red-600 */
+      :root {
+	  --pal0: #FFFFFF;
+	  --pal1: #FF0000;
+	  --pal2: #00FF00;
+	  --pal3: #0000FF;
+	  --pal4: #FFFF00;
+	  --pal5: #FF00FF;
+	  --pal6: #00FFFF;
+	  --pal7: #FFA500;
+	  --pal8: #800080;
+	  --pal9: #008000;
+	  --pal10: #800000;
+	  --pal11: #40E0D0;
+	  --pal12: #FFC0CB;
+	  --pal13: #A52A2A;
+	  --pal14: #808080;
+	  --pal15: transparent;
+	  --bg-col: black;
+      }
       body {
-          background: black;
-          color: #f3f4f6;  
-          flex-direction: column;
-          min-height: 100vh;
-          font-family: sans-serif;
-          width:100vw;
-          height:100vh;
-          min-width:600px;
-          min-height:400px;
-          padding:0px;
-          margin:0px;
-          overflow: hidden; /* 念のためスクロールバーを非表示に */
+	  background: black;
+	  color: white;
+	  flex-direction: column;
+	  min-height: 100vh;
+	  font-family: sans-serif;
+	  width: 64vw;
+	  height: 92vh;
+	  min-width: 600px;
+	  min-height: 400px;
+	  padding: 0px;
+	  margin: 0px;
+	  overflow: hidden;
       }
-      p {
-          font-size: 0.7rem;
-      }
+      p {  font-size: 0.7rem;      }
+
       #map-con {
-          background: transparent;
-          padding:0px;
-          margin:0px;      
-          display: grid;
-          grid-template-columns: repeat(100, 1fr);
+	  background: transparent;
+	  padding: 0px;
+	  margin: 0px;
+	  display: grid;
+	  transform-origin: top left; /* パン操作の基準点を左上に設定 */
+	  grid-template-columns: repeat(100, 1fr);
       }
+      body.is-selecting-rect,
+      body.is-selecting-rect .cell {
+          cursor: crosshair !important;
+      }
+
       .cell {
-          background: none;
-          color: none;
-          width: 24px;
-          height: 24px;
-          cursor: pointer;
-          transition: border-color 0.1s ease-out;
-          border: 1px dotted rgba(55, 55, 155, 0.5);
-          box-sizing: border-box;  
+	  --cell-bg: transparent;	  
+	  background-color: var(--cell-bg);
+	  color: inherit;
+	  position: relative;
+	  width: 24px;
+	  height: 24px;
+	  cursor: pointer;
+	  transition: border-color 0.1s ease-out, background-color 0.1s;
+	  border: 1px dotted rgba(55, 55, 155, 0.5);
+	  box-sizing: border-box;
+	  z-index: 0px;
       }
+
       .cell.grid-line-col { border-right: 1px solid #448; }
-      .cell.grid-line-row { border-bottom: 1px solid #448;}
-      .cell.explored { border: 1px dotted #484;}
-      
+      .cell.grid-line-row { border-bottom: 1px solid #448; }
+      .cell.explored { border: 1px dotted #484; }
       .cell.explored.grid-line-col { border-right: 1px solid #444; }
-      .cell.explored.grid-line-row { border-bottom: 1px solid #444;}
+      .cell.explored.grid-line-row { border-bottom: 1px solid #444; }
+
       .cell.selecting {
-          background-color: rgba(0, 170, 255, 0.1) !important;
-          outline: 1px solid rgba(0, 220, 255, 0.1) !important;
-	  z-index: 999;
+	  position: relative;
+	  outline: 1px solid rgba(0, 220, 255, 0.1) !important;
+	  z-index: 1;
+	  cursor: grab;
+      }
+
+      .cell.selecting.grabbing,
+      .cell.selecting.grabbing::before {
+	  cursor: grabbing;
+      }
+
+      .cell.selecting::before {
+	  content: '';
+	  position: absolute;
+	  inset: 0;
+	  background-color: rgba(0, 170, 255, 0.2);
       }
 
       .status {
-          display:block;
-	  align:center;
-          height:1.2rem;
-          font-size: 1rem;
-          border-radius: 0.25rem;  
-          transition: opacity 0.3s;
-          opacity: 0;
-          user-select: none;
+	  display: block;
+	  text-align: center;
+	  height: 1.2rem;
+	  font-size: 1rem;
+	  border-radius: 0.25rem;
+	  transition: opacity 0.3s;
+	  opacity: 0;
+	  user-select: none;
       }
+
       .pal-con {
-          position: fixed;
-          left:2vh;
-          top: 2vh;
-          padding: 1.5rem 0.5rem 0.5rem;
-          background-color: rgba(155, 155, 155, 0.1);
-          backdrop-filter: blur(2px);
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-          border-radius: 0.5rem; /* rounded-lg */
-          border: 1px solid rgba(155, 155, 155, 1);
-          flex-shrink: 0;
-          width:120px;
-          z-index: 50;
-          cursor: grab;
-          transition: box-shadow 0.1s;
+	  position: fixed;
+	  left: 2vh;
+	  top: 2vh;
+	  padding: 1.5rem 0.5rem 0.5rem;
+	  background-color: rgba(155, 155, 155, 0.1);
+	  backdrop-filter: blur(2px);
+	  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+	  border-radius: 0.5rem;
+	  /* rounded-lg */
+	  border: 1px solid rgba(155, 155, 155, 1);
+	  flex-shrink: 0;
+	  width: 120px;
+	  z-index: 50;
+	  cursor: grab;
+	  transition: box-shadow 0.1s;
       }
-      .pal-con.grabbing {
-          cursor: grabbing;
-      }
+      .pal-con.grabbing {cursor: grabbing; }
+
       .grip-icon {
-          position: absolute;
-          top: 0rem;  
-          right: 0.5rem;
-          padding: 0rem;
-          color: #9ca3af;
-          opacity: 0.8;  
-          pointer-events: none;
+	  position: absolute;
+	  top: 0rem;
+	  right: 0.5rem;
+	  padding: 0rem;
+	  color: #9ca3af;
+	  opacity: 0.8;
+	  pointer-events: none;
       }
+
       .mark-col {
-          gap: 0.25rem;
-          box-shadow: 0 0 2px rgba(2, 2, 2, 1);
+	  gap: 0.25rem;
+	  box-shadow: 0 0 2px rgba(2, 2, 2, 1);
       }
+
       .col-btn {
-          width: 24px;  
-          height: 24px;
-          margin:1px;
-          border-radius: 0.2rem;
-          transition: transform 0.1s, box-shadow 0.1s;
-          cursor: pointer;
+	  width: 24px;
+	  height: 24px;
+	  margin: 1px;
+	  border-radius: 0.2rem;
+	  transition: transform 0.1s, box-shadow 0.1s;
+	  cursor: pointer;
       }
+
       .col-btn:hover {
-          transform: scale(1.1);
-          box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+	  transform: scale(1.1);
+	  box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
       }
 
       .select-col {
-          box-shadow: 0 0 2px #f00;
+	  box-shadow: 0 0 2px #f00;
       }
-      
+
       .is-hidden {
-          opacity: 0;
-          pointer-events: none;  
+	  opacity: 0;
+	  pointer-events: none;
       }
+
       .loading-overlay {
-          position: absolute;
-          inset: 0;
-          background-color: black;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          transition: opacity 0.3s;
+	  position: absolute;
+	  inset: 0;
+	  background-color: black;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  transition: opacity 0.3s;
       }
+
       .loading-text {
-          margin-top: 1rem;
-          font-size: 1.25rem;
+	  margin-top: 1rem;
+	  font-size: 1.25rem;
       }
+
       .spinner {
-          border: 4px solid rgba(255, 255, 255, 0.3);
-          border-radius: 50%;
-          border-top: 4px solid #fff;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
+	  border: 4px solid rgba(255, 255, 255, 0.3);
+	  border-radius: 50%;
+	  border-top: 4px solid #fff;
+	  width: 40px;
+	  height: 40px;
+	  animation: spin 1s linear infinite;
       }
+
       @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+	  0% {
+              transform: rotate(0deg);
+	  }
+
+	  100% {
+              transform: rotate(360deg);
+	  }
       }
+
       .menu {
-          display:flex;
-          flex-direction:column;
-          font-size: 0.8rem;      
+	  display: flex;
+	  flex-direction: column;
+	  font-size: 0.8rem;
       }
+
       .menu .btn {
-          text-align: center;
-          background-color: rgba(7, 34, 59, 0.95);
-          color:white;
-          border: 1px solid rgba(175, 240, 390, 0.5);
-          transition: background-color 0.2s;
-          width: 95%;
-          height: 20px;
-          margin: 2px;
-          border-radius: 6px;
+	  text-align: center;
+	  background-color: rgba(7, 34, 59, 0.95);
+	  color: white;
+	  border: 1px solid rgba(175, 240, 390, 0.5);
+	  transition: background-color 0.2s;
+	  width: 95%;
+	  height: 20px;
+	  margin: 2px;
+	  border-radius: 6px;
       }
+
       .btn:hover {
-          background-color: rgba(175, 240, 390, 0.5);
-          color:black;
-          box-shadow: 0 4px 12px rgba(143, 143, 143, 0.7);      
-          cursor:pointer;
+	  background-color: rgba(175, 240, 390, 0.5);
+	  color: black;
+	  box-shadow: 0 4px 12px rgba(143, 143, 143, 0.7);
+	  cursor: pointer;
       }
+
       #name {
-          display: block;
+	  display: block;
 	  position: fixed;
-          font-family: impact;
-          font-weight: bold;
-          font-size: 20rem;
-          color: #111;
-          top:3px;
-          z-index: -9999;
+	  font-family: impact;
+	  font-weight: bold;
+	  font-size: 20rem;
+	  color: #111;
+	  top: 3px;
+	  z-index: -9999;
       }
     </style>
+    
   </head>
+  <!--   https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js -->
+  <script src="html2canvas.min.js"></script>  
   <body>
     <div id="name">Wiz Mapper</div>
-    <div id="map-con"></div>
+    <div class="map-con" id="map-con"></div>
     <div id="status" class="status"></div>
     <div id="pal-con" class="pal-con" title="draggable color pal">
       <div class="btn" id="pal"></div>
       <div class="grip-icon"> ⠿ </div>
       <div id="col-pal"></div>
       <hr>
-      <div class="menu">    
-        <div class="btn" id="clr-map">All Clear</div>
-        <div class="btn" id="menu1">menu1</div>
-        <div class="btn" id="menu2">menu2</div>
-        <div class="btn" id="menu3">menu3</div>              
+      <div class="menu">
+	<div class="btn" id="clr-map">ワイプ</div>
+	<div class="btn" id="pip-btn">常に手前に表示</div>
+	<div class="btn" id="reset-view-btn">表示リセット</div>
+	<div class="btn" id="print-btn">印刷(試験的)</div>
       </div>
     </div>
-
     <div id="loading-overlay" class="loading-overlay">
       <div class="spinner"></div>
       <p class="loading-text">Loading...</p>
     </div>
 
     <script type="module">
-      const PAL = [
-          '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
-          '#FFA500', '#800080', '#008000', '#800000', '#40E0D0', '#FFC0CB', '#A52A2A',
-          '#808080', '#000000'
-      ];
+      const rootStyles = getComputedStyle(document.documentElement);
+      const PAL = Array.from({ length: 16 }, (_, i) =>
+	  rootStyles.getPropertyValue(`--pal${i}`).trim()
+      );
       const BsCOL = 15; // base color index 
       const COL_MAP = PAL.reduce((a, c, i) => { a[i] = c; return a; }, {});
       const GrSZ = 100; // grid size
@@ -218,260 +276,488 @@
       let dragOffX = 0;
       let dragOffY = 0;
       let inPal = false;
+      let isDrawing = false; // 左ドラッグで描画中かどうかのフラグ
 
-      let isSelecting = false; // 矩形選択中かどうかのフラグ
+      let isSelct = false; // 矩形選択中かどうかのフラグ
       let selStartIdx = null;  // 選択開始セルのインデックス
       let clipboard = { data: null, width: 0, height: 0 }; // コピーしたデータを保持
+      let isSelActive = false; // 矩形選択が確定しているかどうかのフラグ
+      let isMovSel = false; // 選択領域を移動中かどうかのフラグ
+      let mvStartIdx = null; // 移動開始時の起点セルインデックス
+      let srcTLIdx = null; // 移動する選択領域の元の左上インデックス
+      
+      let isPanning = false; // マップをパン（移動）中かどうかのフラグ
+      let panStartX = 0;
+      let panStartY = 0;
+      let iniTrns = { x: 0, y: 0 };
 
       const clrMap = document.getElementById('clr-map');
-      
+
       const showStatus = (message) => {
-          status.textContent = message;
-          status.className = `status`;
-          status.style.opacity = 1;
-          setTimeout(() => {
+	  status.textContent = message;
+	  status.className = `status`;
+	  status.style.opacity = 1;
+	  setTimeout(() => {
               status.style.opacity = 0;
-          }, 2000);
+	  }, 2000);
       };
 
       const saveMap = () => {
-          try {
+	  try {
               const mapString = Array.from(mapState).map(v => v.toString(16)).join('');
               localStorage.setItem(MAP_KEY, mapString);
-          } catch (error) {
+	  } catch (error) {
               console.error("Local Storage save error:", error);
               showStatus('保存中にエラーが発生しました');
-          }
+	  }
       };
 
       const renderGrid = () => {
-          if (mapCon.children.length === 0) {
+	  if (mapCon.children.length === 0) {
               mapCon.innerHTML = '';
-              for (let i = 0; i < GrSZ * GrSZ; i++) { 
-                  const cell = document.createElement('div');
-                  cell.classList.add('cell');
-                  cell.dataset.idx = i;
-                  const col = i % GrSZ;
-                  if (col % 10 === 9 && col < GrSZ - 1) {
-                      cell.classList.add('grid-line-col');
-                  }
-                  const row = Math.floor(i / GrSZ);
-                  if (row % 10 === 9 && row < GrSZ - 1) {
-                      cell.classList.add('grid-line-row');
-                  }
-                  mapCon.appendChild(cell);
+              for (let i = 0; i < GrSZ * GrSZ; i++) {
+		  const cell = document.createElement('div');
+		  cell.classList.add('cell');
+		  cell.dataset.idx = i;
+		  const col = i % GrSZ;
+		  if (col % 10 === 9 && col < GrSZ - 1) {
+		      cell.classList.add('grid-line-col');
+		  }
+		  const row = Math.floor(i / GrSZ);
+		  if (row % 10 === 9 && row < GrSZ - 1) {
+		      cell.classList.add('grid-line-row');
+		  }
+		  mapCon.appendChild(cell);
               }
-          }
-          for (let i = 0; i < GrSZ * GrSZ; i++) {
+	  }
+	  for (let i = 0; i < GrSZ * GrSZ; i++) {
               const cell = mapCon.children[i];
               const c = mapState[i];
-              cell.style.backgroundColor = COL_MAP[c];
+              cell.style.setProperty('--cell-bg', COL_MAP[c]);
               if (c !== BsCOL) {
-                  cell.classList.add('explored');
+		  cell.classList.add('explored');
               } else {
 		  cell.classList.remove('explored');
               }
-          }
+	  }
       };
 
-      const handleCell = (i) => {
-          mapState[i] = mapState[i] === BsCOL ? selCol : BsCOL;
-          const cell = mapCon.children[i];
-          cell.style.backgroundColor = COL_MAP[mapState[i]];
-          cell.classList.toggle('explored', mapState[i] !== BsCOL);
-          saveMap();
+      const handleCell = (i, color = null) => {
+	  mapState[i] = color !== null ? color : (mapState[i] === BsCOL ? selCol : BsCOL);
+	  const cell = mapCon.children[i];
+	  cell.style.setProperty('--cell-bg', COL_MAP[mapState[i]]);
+	  cell.classList.toggle('explored', mapState[i] !== BsCOL);
       };
 
       const createPal = () => {
-          const palDiv = document.getElementById('col-pal');
-          palDiv.innerHTML = `<div id="mark-col" class="mark-col-grid"></div>`;
-          const markerColorsDiv = document.getElementById('mark-col');
-          PAL.forEach((c, i) => {
+	  const palDiv = document.getElementById('col-pal');
+	  palDiv.innerHTML = `<div id="mark-col" class="mark-col"></div>`;
+	  const markerColorsDiv = document.getElementById('mark-col');
+	  PAL.forEach((c, i) => {
               const b = document.createElement('button');
               b.classList.add('col-btn');
               b.style.backgroundColor = c;
               b.dataset.colorIdx = i;
-	      
+
               if (i === selCol)
 		  b.classList.add('select-col');
 
               b.addEventListener('click', () => {
-                  inPal = true;
-                  document.querySelector('.select-col')?.classList.remove('select-col');
-                  selCol = i;
-                  b.classList.add('select-col');
+		  inPal = true;
+		  document.querySelector('.select-col')?.classList.remove('select-col');
+		  selCol = i;
+		  b.classList.add('select-col');
               });
               markerColorsDiv.appendChild(b);
-          });
+	  });
       };
-      
+
+      /**
+       * 指定した位置とサイズで矩形選択のハイライトを描画する関数
+       * @param {number} topLeftIdx - 描画開始位置（左上）のインデックス
+       * @param {number} width - 矩形の幅
+       * @param {number} height - 矩形の高さ
+       */
+      const drawSelectionHighlight = (topLeftIdx, width, height) => {
+	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
+	  if (topLeftIdx === null) return;
+	  const startCol = topLeftIdx % GrSZ;
+	  const startRow = Math.floor(topLeftIdx / GrSZ);
+	  for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+		  const index = (startRow + y) * GrSZ + (startCol + x);
+		  mapCon.children[index]?.classList.add('selecting');
+	      }
+	  }
+      };
       /**
        * 矩形選択のハイライトを更新する関数
        */
       const updateSelectionHighlight = (endIdx) => {
-          document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
-          if (selStartIdx === null || endIdx === null) return;
-          const startCol = selStartIdx % GrSZ;
-          const startRow = Math.floor(selStartIdx / GrSZ);
-          const endCol = endIdx % GrSZ;
-          const endRow = Math.floor(endIdx / GrSZ);
-          const minCol = Math.min(startCol, endCol);
-          const maxCol = Math.max(startCol, endCol);
-          const minRow = Math.min(startRow, endRow);
-          const maxRow = Math.max(startRow, endRow);
-          for (let row = minRow; row <= maxRow; row++) {
-              for (let col = minCol; col <= maxCol; col++) {
-		  const index = row * GrSZ + col;
-		  mapCon.children[index]?.classList.add('selecting');
-              }
-          }
+	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
+	  
+	  if (selStartIdx === null || endIdx === null) return;
+	  const startCol = selStartIdx % GrSZ;
+	  const startRow = Math.floor(selStartIdx / GrSZ);
+	  const endCol = endIdx % GrSZ;
+	  const endRow = Math.floor(endIdx / GrSZ);
+	  const minCol = Math.min(startCol, endCol);
+	  const maxCol = Math.max(startCol, endCol);
+	  const minRow = Math.min(startRow, endRow);
+	  const maxRow = Math.max(startRow, endRow);
+	  drawSelectionHighlight(minRow * GrSZ + minCol, maxCol - minCol + 1, maxRow - minRow + 1);
       };
 
       /**
        * 選択範囲のデータをクリップボード用変数にコピーする関数
        */
       const copySelectedData = (endIdx) => {
-          if (selStartIdx === null || endIdx === null) return;
-          const startCol = selStartIdx % GrSZ;
-          const startRow = Math.floor(selStartIdx / GrSZ);
-          const endCol = endIdx % GrSZ;
-          const endRow = Math.floor(endIdx / GrSZ);
-          const minCol = Math.min(startCol, endCol);
-          const maxCol = Math.max(startCol, endCol);
-          const minRow = Math.min(startRow, endRow);
-          const maxRow = Math.max(startRow, endRow);
+	  if (selStartIdx === null || endIdx === null) return;
+	  const startCol = selStartIdx % GrSZ;
+	  const startRow = Math.floor(selStartIdx / GrSZ);
+	  const endCol = endIdx % GrSZ;
+	  const endRow = Math.floor(endIdx / GrSZ);
+	  const minCol = Math.min(startCol, endCol);
+	  const maxCol = Math.max(startCol, endCol);
+	  const minRow = Math.min(startRow, endRow);
+	  const maxRow = Math.max(startRow, endRow);
 
-          const width = maxCol - minCol + 1;
-          const height = maxRow - minRow + 1;
-          const data = [];
+	  const width = maxCol - minCol + 1;
+	  const height = maxRow - minRow + 1;
+	  const data = [];
 
-          for (let y = 0; y < height; y++) {
+	  for (let y = 0; y < height; y++) {
               const rowData = new Uint8Array(width);
               for (let x = 0; x < width; x++) {
-                  const index = (minRow + y) * GrSZ + (minCol + x);
-                  rowData[x] = mapState[index];
+		  const index = (minRow + y) * GrSZ + (minCol + x);
+		  rowData[x] = mapState[index];
               }
               data.push(rowData);
-          }
+	  }
 
-          clipboard = { data, width, height };
-          showStatus(`${width}x${height} の範囲をコピーしました`);
-          console.log("Copied to clipboard:", clipboard); // デバッグ用にコンソールに出力
+	  clipboard = { data, width, height };
+	  showStatus(`${width}x${height} の範囲をコピーしました`);
+	  console.log("Copied to clipboard:", clipboard); // デバッグ用にコンソールに出力
       };
 
+      /**
+       * 指定した位置にクリップボードの内容を貼り付ける（ペーストする）関数
+       * @param {number} topLeftIdx - 貼り付け先の左上インデックス
+       */
+      const pasteClipboard = (topLeftIdx) => {
+	  if (!clipboard.data) return;
+	  const { data, width, height } = clipboard;
+	  const startCol = topLeftIdx % GrSZ;
+	  const startRow = Math.floor(topLeftIdx / GrSZ);
+	  // 移動元をクリア
+	  if (srcTLIdx !== null) {
+	      const origStartCol = srcTLIdx % GrSZ;
+	      const origStartRow = Math.floor(srcTLIdx / GrSZ);
+	      for (let y = 0; y < height; y++) {
+		  for (let x = 0; x < width; x++) {
+		      handleCell((origStartRow + y) * GrSZ + (origStartCol + x), BsCOL);
+		  }
+	      }
+	  }
+	  // 貼り付け先に描画
+	  for (let y = 0; y < height; y++) {
+	      for (let x = 0; x < width; x++) {
+		  const mapIndex = (startRow + y) * GrSZ + (startCol + x);
+		  handleCell(mapIndex, data[y][x]);
+	      }
+	  }
+	  saveMap();
+	  showStatus(`${width}x${height} の範囲を移動しました`);
+      };
+      
+
+      /**
+       * 選択領域をクリアする関数
+       */
+      const clearSelection = () => {
+	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
+	  isSelActive = false;
+	  selStartIdx = null;
+	  clipboard = { data: null, width: 0, height: 0 };
+      };
       const loadMap = () => {
-          const mapString = localStorage.getItem(MAP_KEY);
-          if (mapString && mapString.length === GrSZ * GrSZ) {
+	  const mapString = localStorage.getItem(MAP_KEY);
+	  if (mapString && mapString.length === GrSZ * GrSZ) {
               for (let i = 0; i < mapState.length; i++) {
-                  mapState[i] = parseInt(mapString[i], 16);
+		  mapState[i] = parseInt(mapString[i], 16);
               }
               showStatus('Loaded Map form Your Browser(Local Strage ).', MAP_KEY);
-          } else {
+	  } else {
               showStatus('Created New map.');
-	      mapState.fill(BsCOL);
-          }
-          renderGrid();
-          document.getElementById('loading-overlay').classList.add('is-hidden');
+              mapState.fill(BsCOL);
+	  }
+	  renderGrid();
+	  document.getElementById('loading-overlay').classList.add('is-hidden');
       };
 
       mapCon.addEventListener('mousedown', (e) => {
-          const cell = e.target.closest('.cell');
-          if (!cell || inPal) return;
+	  const cell = e.target.closest('.cell');
 
-          if (e.button === 0) { // 左クリック
-              const i = parseInt(cell.dataset.idx, 10);
-              handleCell(i);
-          } else if (e.button === 2) { // 右クリック
+	  // 中ボタン、または左右同時押しでのパン操作開始
+	  if (e.button === 1 || e.buttons === 3) {
+	      e.preventDefault();
+	      isPanning = true;
+	      panStartX = e.clientX;
+	      panStartY = e.clientY;
+	      
+	      const currentTransform = new DOMMatrix(getComputedStyle(mapCon).transform);
+	      iniTrns.x = currentTransform.m41;
+	      iniTrns.y = currentTransform.m42;
+	      
+	      mapCon.style.cursor = 'grabbing';
+	      return;
+	  }
+
+	  if (!cell || inPal) return;
+
+	  // 選択領域外での左クリックで選択解除
+	  if (isSelActive && !cell.classList.contains('selecting') && e.button === 0) {
+              clearSelection();
+	  }
+
+	  if (e.button === 0) { // 左クリック
+              if (cell.classList.contains('selecting')) {
+		  // 選択領域内の左クリック: ドラッグ移動を開始
+		  e.preventDefault();
+		  isMovSel = true;
+		  mvStartIdx = parseInt(cell.dataset.idx, 10);
+
+		  // 移動元の左上インデックスを計算して保持
+		  const selectedCells = document.querySelectorAll('.cell.selecting');
+		  srcTLIdx = Array.from(selectedCells).reduce((min, c) => Math.min(min, parseInt(c.dataset.idx, 10)), Infinity);
+		  selectedCells.forEach(c => c.classList.add('grabbing'));
+
+              } else {
+		  // 通常のセルクリック
+		  isDrawing = true;
+		  const i = parseInt(cell.dataset.idx, 10);
+		  handleCell(i);
+              }
+	  } else if (e.button === 2) { // 右クリック
               e.preventDefault();
-              isSelecting = true;
+              // 既存の選択をクリアして新しい選択を開始
+              clearSelection();
+              isSelct = true;
+              document.body.classList.add('is-selecting-rect');
+              isSelActive = true;
               selStartIdx = parseInt(cell.dataset.idx, 10);
               updateSelectionHighlight(selStartIdx);
-          }
+	  }
       });
 
       mapCon.addEventListener('mouseover', (e) => {
-          if (!isSelecting) return;
-          const cell = e.target.closest('.cell');
-          if (cell) {
+	  // パン中は他のマウスオーバー処理を中断
+	  if (isPanning) {
+	      // isPanningがtrueでも、ボタンが離されている場合があるためチェック
+	      if (e.buttons !== 4 && e.buttons !== 3) {
+		  isPanning = false;
+		  mapCon.style.cursor = '';
+	      }
+	  }
+	  const cell = e.target.closest('.cell');
+	  if (!cell) return;
+
+	  if (isDrawing) { // 左ドラッグ描画中の処理
+	      const i = parseInt(cell.dataset.idx, 10);
+	      handleCell(i);
+	  }
+	  if (isSelct) { // 矩形選択中のハイライト更新
               const currentIdx = parseInt(cell.dataset.idx, 10);
               updateSelectionHighlight(currentIdx);
-          }
+	  } else if (isMovSel) { // 選択領域の移動中のハイライト更新
+	      const currentIdx = parseInt(cell.dataset.idx, 10);
+	      const startRow = Math.floor(mvStartIdx / GrSZ);
+	      const startCol = mvStartIdx % GrSZ;
+	      const currentRow = Math.floor(currentIdx / GrSZ);
+	      const currentCol = currentIdx % GrSZ;
+	      const deltaRow = currentRow - startRow;
+	      const deltaCol = currentCol - startCol;
+	      const newTL = srcTLIdx + deltaRow * GrSZ + deltaCol;
+	      drawSelectionHighlight(newTL, clipboard.width, clipboard.height);
+	  }
       });
-      
-      document.addEventListener('mouseup', (e) => {
-          if (isDrag) {
-              isDrag = false;
-              palCon.classList.remove('grabbing');
-          }
-          inPal = false;
-          if (isSelecting && e.button === 2) {          // 矩形選択の終了処理
-              const cell = e.target.closest('.cell');
-              if (cell) {
+
+      const handleMouseUp = (e) => {
+	  if (isDrag) {
+	      isDrag = false;
+	      palCon.classList.remove('grabbing');
+	  }
+	  if (isPanning) {
+	      isPanning = false;
+	      mapCon.style.cursor = '';
+	  }
+	  if (isDrawing) {
+	      isDrawing = false;
+	      saveMap(); // 描画が終わったら保存
+	      showStatus('マップを保存しました');
+	  }
+	  if (isMovSel) {
+	      const cell = e.target.closest('.cell');
+	      if (cell) {
+		  const endIdx = parseInt(cell.dataset.idx, 10);
+		  const startRow = Math.floor(mvStartIdx / GrSZ);
+		  const startCol = mvStartIdx % GrSZ;
+		  const endRow = Math.floor(endIdx / GrSZ);
+		  const endCol = endIdx % GrSZ;
+		  const deltaRow = endRow - startRow;
+		  const deltaCol = endCol - startCol;
+		  const pasteTLIdx = srcTLIdx + deltaRow * GrSZ + deltaCol;
+
+		  pasteClipboard(pasteTLIdx); // 貼り付けを実行
+		  clearSelection(); // 選択範囲とクリップボードをクリア
+	      }
+	      isMovSel = false;
+	      mvStartIdx = null;
+	      srcTLIdx = null; // 移動元の情報をクリア
+	  }
+	  document.querySelectorAll('.cell.grabbing').forEach(c => c.classList.remove('grabbing'));
+	  inPal = false;
+	  if (isSelct && e.button === 2) {          // 矩形選択の終了処理
+	      const cell = e.target.closest('.cell');
+	      if (cell) {
 		  const endIdx = parseInt(cell.dataset.idx, 10);
 		  copySelectedData(endIdx);
-              }
-              // ハイライトを解除
-//              document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
-              isSelecting = false;
-              selStartIdx = null;
-          }
+	      }
+	      isSelct = false;
+	      document.body.classList.remove('is-selecting-rect');
+	  }
+      };
+      const handleMouseMove = (e) => {
+	  // パン操作中のマップ移動
+	  if (isPanning) {
+	      const dx = e.clientX - panStartX;
+	      const dy = e.clientY - panStartY;
+	      mapCon.style.transform = `translate(${iniTrns.x + dx}px, ${iniTrns.y + dy}px)`;
+	      return;
+	  }
+
+	  // パレット移動
+	  if (isDrag) {
+	      let newX = e.clientX - dragOffX;
+	      let newY = e.clientY - dragOffY;
+	      const maxX = window.innerWidth - palCon.offsetWidth;
+	      const maxY = window.innerHeight - palCon.offsetHeight;
+	      newX = Math.max(0, Math.min(newX, maxX));
+	      newY = Math.max(0, Math.min(newY, maxY));
+	      palCon.style.left = `${newX}px`;
+	      palCon.style.top = `${newY}px`;
+	  }
+      };
+
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('mousemove', handleMouseMove);
+
+      const resetViewBtn = document.getElementById('reset-view-btn');
+      resetViewBtn.addEventListener('click', () => {
+	  // CSSのtransformを初期値に戻す
+	  mapCon.style.transform = 'translate(0px, 0px)';
+	  // パン操作の状態もリセット
+	  iniTrns.x = 0;
+	  iniTrns.y = 0;
+	  showStatus('表示位置をリセットしました');
+      });
+
+      const printBtn = document.getElementById('print-btn');
+      printBtn.addEventListener('click', () => {
+	  showStatus('マップを画像に変換しています...');
+	  // html2canvas を使って #map-con を画像化
+	  html2canvas(mapCon, {
+	      backgroundColor: getComputedStyle(document.body).backgroundColor // 背景色を指定
+	  }).then(canvas => {
+	      const printWindow = window.open('', '_blank');
+	      printWindow.document.write(`
+		  <!DOCTYPE html>
+		  <html>
+		  <head><title>マップの印刷</title></head>
+		  <body style="margin:0;">
+		      <img src="${canvas.toDataURL('image/png')}" style="width:100%;">
+		  </body>
+		  </html>
+	      `);
+	      printWindow.document.close();
+	      printWindow.onload = () => { printWindow.print(); };
+	  });
       });
 
       clrMap.addEventListener('click', () => {
 	  if (confirm('\n ┌○┐\n │ ワ│ハ_ハ\n │ イ│ ﾟωﾟ )　　　　　　　マップを全て消去します\n │ プ│ ／  | 　　　　　　　この操作は元に戻せません\n └○┘   (⌒)\n        し⌒  ￣\n')) {
               mapState.fill(BsCOL);
               renderGrid();
-              saveMap();
+              saveMap(); 
               showStatus('マップをリセットしました');
-          }
+	  }
       });
 
       palCon.addEventListener('mousedown', (e) => {
-          if (e.target.closest('button')) {
+	  if (e.target.closest('button')) {
               inPal = true;
               e.stopPropagation();
               return;
-          }
-          isDrag = true;
-          palCon.classList.add('grabbing');
-          const rect = palCon.getBoundingClientRect();
-          dragOffX = e.clientX - rect.left;
-          dragOffY = e.clientY - rect.top;
-          e.preventDefault();
+	  }
+	  isDrag = true;
+	  palCon.classList.add('grabbing');
+	  const rect = palCon.getBoundingClientRect();
+	  dragOffX = e.clientX - rect.left;
+	  dragOffY = e.clientY - rect.top;
+	  e.preventDefault();
       });
 
-      document.addEventListener('mousemove', (e) => {
-          if (!isDrag) return;
-          let newX = e.clientX - dragOffX;
-          let newY = e.clientY - dragOffY;
-          const maxX = window.innerWidth - palCon.offsetWidth;
-          const maxY = window.innerHeight - palCon.offsetHeight;
-          newX = Math.max(0, Math.min(newX, maxX));
-          newY = Math.max(0, Math.min(newY, maxY));
-          palCon.style.left = `${newX}px`;
-          palCon.style.top = `${newY}px`;
-      });
-      
       window.addEventListener('resize', () => {
-          const rect = palCon.getBoundingClientRect();
-          let newX = rect.left;
-          let newY = rect.top;
-          const maxX = window.innerWidth - palCon.offsetWidth;
-          const maxY = window.innerHeight - palCon.offsetHeight;
-          newX = Math.max(0, Math.min(newX, maxX));
-          newY = Math.max(0, Math.min(newY, maxY));
-          palCon.style.left = `${newX}px`;
-          palCon.style.top = `${newY}px`;
+	  const rect = palCon.getBoundingClientRect();
+	  let newX = rect.left;
+	  let newY = rect.top;
+	  const maxX = window.innerWidth - palCon.offsetWidth;
+	  const maxY = window.innerHeight - palCon.offsetHeight;
+	  newX = Math.max(0, Math.min(newX, maxX));
+	  newY = Math.max(0, Math.min(newY, maxY));
+	  palCon.style.left = `${newX}px`;
+	  palCon.style.top = `${newY}px`;
       });
-      
+
       (() => {
-          createPal();
-          loadMap();
+	  createPal();
+	  loadMap();
       })();
 
       // ブラウザの右クリックメニューを無効化
       mapCon.addEventListener('contextmenu', (e) => e.preventDefault());
 
+      // --- Picture-in-Picture 機能 ---
+      const pipButton = document.getElementById('pip-btn');
+      let pipWindow = null;
+
+      pipButton.addEventListener('click', async () => {
+	  if (!window.documentPictureInPicture) {
+	      showStatus('お使いのブラウザはこの機能に未対応です');
+	      return;
+	  }
+	  try {
+	      pipWindow = await window.documentPictureInPicture.requestWindow({
+		  width: mapCon.clientWidth,
+		  height: mapCon.clientHeight,
+	      });
+	      [...document.styleSheets].forEach((styleSheet) => {
+		  const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+		  const style = document.createElement('style');
+		  style.textContent = cssRules;
+		  pipWindow.document.head.appendChild(style);
+	      });
+	      pipWindow.document.body.append(mapCon);
+	      pipWindow.document.addEventListener('mouseup', handleMouseUp);
+	      pipWindow.document.addEventListener('mousemove', handleMouseMove);
+	      pipWindow.addEventListener('pagehide', (event) => {
+		  document.body.insertBefore(mapCon, document.getElementById('status'));
+		  pipWindow = null;
+	      });
+	  } catch (error) {
+	      console.error('Picture-in-Picture Error:', error);
+	  }
+      });
     </script>
   </body>
 </html>

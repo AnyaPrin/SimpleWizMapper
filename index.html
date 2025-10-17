@@ -94,6 +94,32 @@
 	  background-color: rgba(0, 170, 255, 0.2);
       }
 
+      /* メモありセルに表示するインジケーター */
+      .cell.has-memo::after {
+	  content: '';
+	  position: absolute;
+	  top: 0;
+	  right: 0;
+	  width: 0;
+	  height: 0;
+	  border-style: solid;
+	  border-width: 0 5px 5px 0;
+	  border-color: transparent #f0f transparent transparent;
+      }
+
+      /* カスタムツールチップ */
+      .tooltip {
+	  position: fixed;
+	  display: none;
+	  padding: 4px 8px;
+	  background-color: #222;
+	  color: white;
+	  border: 1px solid #888;
+	  border-radius: 4px;
+	  font-size: 0.8rem;
+	  z-index: 1000;
+	  pointer-events: none; /* ツールチップがマウスイベントを妨げないようにする */
+      }
       .status {
 	  display: block;
 	  text-align: center;
@@ -249,6 +275,7 @@
     <div id="name">Wiz Mapper</div>
     <div class="map-con" id="map-con"></div>
     <div id="status" class="status"></div>
+    <div id="tooltip" class="tooltip"></div>
     <div id="pal-con" class="pal-con" title="draggable color pal">
       <div class="btn" id="pal"></div>
       <div class="grip-icon"> ⠿ </div>
@@ -275,10 +302,13 @@
       const BsCOL = 15; // base color index 
       const COL_MAP = PAL.reduce((a, c, i) => { a[i] = c; return a; }, {});
       const GrSZ = 100; // grid size
+      const MEMO_KEY = 'wiz_mapper_memos';
+      let memoData = new Map();
       const MAP_KEY = 'wiz_mapper';
       let mapState = new Uint8Array(GrSZ * GrSZ).fill(BsCOL);
       let mapCon = document.getElementById('map-con');
       let status = document.getElementById('status');
+      const tooltip = document.getElementById('tooltip');
       let selCol = 0;
       const palCon = document.getElementById('pal-con');
       let isDrag = false;
@@ -322,6 +352,17 @@
 	  }
       };
 
+      const saveMemos = () => {
+	  try {
+	      const memoArray = Array.from(memoData.entries());
+	      localStorage.setItem(MEMO_KEY, JSON.stringify(memoArray));
+	  } catch (error) {
+	      console.error("Local Storage save error (memos):", error);
+	      showStatus('メモの保存中にエラーが発生しました');
+	  }
+      };
+
+
       const renderGrid = () => {
 	  if (mapCon.children.length === 0) {
               mapCon.innerHTML = '';
@@ -349,6 +390,11 @@
               } else {
 		  cell.classList.remove('explored');
               }
+	      if (memoData.has(i)) {
+		  cell.classList.add('has-memo');		  
+	      } else {
+		  cell.classList.remove('has-memo');
+	      }
 	  }
       };
 
@@ -357,6 +403,11 @@
 	  const cell = mapCon.children[i];
 	  cell.style.setProperty('--cell-bg', COL_MAP[mapState[i]]);
 	  cell.classList.toggle('explored', mapState[i] !== BsCOL);
+      };
+
+      const updateMemoOnCell = (i, text) => {
+	  const cell = mapCon.children[i];
+	  cell.classList.toggle('has-memo', !!text);
       };
 
       const createPal = () => {
@@ -491,6 +542,18 @@
 	  selStartIdx = null;
 	  clipboard = { data: null, width: 0, height: 0, topLeftIdx: null };
       };
+
+      const loadMemos = () => {
+	  const memoString = localStorage.getItem(MEMO_KEY);
+	  if (memoString) {
+	      try {
+		  memoData = new Map(JSON.parse(memoString));
+	      } catch (e) {
+		  console.error("Failed to parse memos:", e);
+		  memoData = new Map();
+	      }
+	  }
+      };
       const loadMap = () => {
 	  const mapString = localStorage.getItem(MAP_KEY);
 	  if (mapString && mapString.length === GrSZ * GrSZ) {
@@ -502,6 +565,7 @@
               showStatus('Created New map.');
               mapState.fill(BsCOL);
 	  }
+	  loadMemos();
 	  renderGrid();
 	  document.getElementById('loading-overlay').classList.add('is-hidden');
       };
@@ -532,7 +596,22 @@
 	  }
 
 	  if (e.button === 0) { // 左クリック
-              if (cell.classList.contains('selecting')) {
+	      if (e.shiftKey) { // Shift + 左クリックでメモ編集
+		  e.preventDefault();
+		  const i = parseInt(cell.dataset.idx, 10);
+		  const currentMemo = memoData.get(i) || '';
+		  const newMemo = prompt('メモを入力してください:', currentMemo);
+
+		  if (newMemo !== null) { // キャンセルされなかった場合
+		      if (newMemo) {
+			  memoData.set(i, newMemo);
+		      } else {
+			  memoData.delete(i);
+		      }
+		      updateMemoOnCell(i, newMemo);
+		      saveMemos();
+		  }
+	      } else if (cell.classList.contains('selecting')) {
 		  // 選択領域内の左クリック: ドラッグ移動を開始
 		  e.preventDefault();
 		  isMovSel = true;
@@ -577,6 +656,19 @@
 	      const i = parseInt(cell.dataset.idx, 10);
 	      handleCell(i);
 	  }
+	  // メモのツールチップ表示
+	  if (cell.classList.contains('has-memo')) {
+	      const i = parseInt(cell.dataset.idx, 10);
+	      const memoText = memoData.get(i);
+	      if (memoText) {
+		  tooltip.textContent = memoText;
+		  tooltip.style.display = 'block';
+	      }
+	  } else {
+	      tooltip.style.display = 'none';
+	  }
+
+
 	  if (isSelct) { // 矩形選択中のハイライト更新
               const currentIdx = parseInt(cell.dataset.idx, 10);
               updateSelectionHighlight(currentIdx);
@@ -657,6 +749,12 @@
 	      newY = Math.max(0, Math.min(newY, maxY));
 	      palCon.style.left = `${newX}px`;
 	      palCon.style.top = `${newY}px`;
+	  }
+
+	  // ツールチップの位置を更新
+	  if (tooltip.style.display === 'block') {
+	      tooltip.style.left = `${e.clientX + 15}px`;
+	      tooltip.style.top = `${e.clientY + 15}px`;
 	  }
       };
 
@@ -748,6 +846,7 @@
       (() => {
 	  createPal();
 	  loadMap();
+	  loadMemos();
       })();
 
       // ブラウザの右クリックメニューを無効化

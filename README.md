@@ -1,1 +1,1 @@
-Simple Wiz Mapper
+Simple and Easy Mapper

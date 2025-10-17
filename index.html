@@ -247,9 +247,10 @@
       <div id="col-pal"></div>
       <hr>
       <div class="menu">
+	<div class="btn" id="clr-sel">選択領域をクリア</div>
 	<div class="btn" id="clr-map">ワイプ</div>
 	<div class="btn" id="pip-btn">常に手前に表示</div>
-	<div class="btn" id="reset-view-btn">表示リセット</div>
+	<div class="btn" id="reset-view-btn">位置リセット</div>
 	<div class="btn" id="print-btn">印刷(試験的)</div>
       </div>
     </div>
@@ -280,7 +281,7 @@
 
       let isSelct = false; // 矩形選択中かどうかのフラグ
       let selStartIdx = null;  // 選択開始セルのインデックス
-      let clipboard = { data: null, width: 0, height: 0 }; // コピーしたデータを保持
+      let clipboard = { data: null, width: 0, height: 0, topLeftIdx: null }; // コピーしたデータを保持
       let isSelActive = false; // 矩形選択が確定しているかどうかのフラグ
       let isMovSel = false; // 選択領域を移動中かどうかのフラグ
       let mvStartIdx = null; // 移動開始時の起点セルインデックス
@@ -292,6 +293,20 @@
       let iniTrns = { x: 0, y: 0 };
 
       const clrMap = document.getElementById('clr-map');
+
+      /**
+       * マップ上のカーソルを選択色で更新する
+       * @param {string} color - CSSの色文字列 (e.g., '#FF0000')
+       */
+      const updateCursor = (color) => {
+	  // 16x16のSVGカーソルを作成。中央がホットスポット。
+	  const svg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7" fill="${color}" stroke="black" stroke-width="1.5"/><circle cx="8" cy="8" r="7" fill="${color}" stroke="white" stroke-width="0.5"/></svg>`;
+	  const cursorUrl = `url('data:image/svg+xml;base64,${btoa(svg)}')`;
+	  // ホットスポットをSVGの中央(8,8)に設定し、pointerをフォールバックとして指定
+	  mapCon.style.cursor = `${cursorUrl} 8 8, pointer`;
+      };
+
+
 
       const showStatus = (message) => {
 	  status.textContent = message;
@@ -367,6 +382,7 @@
 		  document.querySelector('.select-col')?.classList.remove('select-col');
 		  selCol = i;
 		  b.classList.add('select-col');
+		  updateCursor(COL_MAP[selCol]);
               });
               markerColorsDiv.appendChild(b);
 	  });
@@ -420,6 +436,7 @@
 	  const minCol = Math.min(startCol, endCol);
 	  const maxCol = Math.max(startCol, endCol);
 	  const minRow = Math.min(startRow, endRow);
+	  const topLeftIdx = minRow * GrSZ + minCol;
 	  const maxRow = Math.max(startRow, endRow);
 
 	  const width = maxCol - minCol + 1;
@@ -435,7 +452,7 @@
               data.push(rowData);
 	  }
 
-	  clipboard = { data, width, height };
+	  clipboard = { data, width, height, topLeftIdx };
 	  showStatus(`${width}x${height} の範囲をコピーしました`);
 	  console.log("Copied to clipboard:", clipboard); // デバッグ用にコンソールに出力
       };
@@ -478,7 +495,7 @@
 	  document.querySelectorAll('.cell.selecting').forEach(c => c.classList.remove('selecting'));
 	  isSelActive = false;
 	  selStartIdx = null;
-	  clipboard = { data: null, width: 0, height: 0 };
+	  clipboard = { data: null, width: 0, height: 0, topLeftIdx: null };
       };
       const loadMap = () => {
 	  const mapString = localStorage.getItem(MAP_KEY);
@@ -554,9 +571,9 @@
 	  // パン中は他のマウスオーバー処理を中断
 	  if (isPanning) {
 	      // isPanningがtrueでも、ボタンが離されている場合があるためチェック
-	      if (e.buttons !== 4 && e.buttons !== 3) {
+	      if (e.buttons !== 4 && e.buttons !== 3) { // 4=中ボタン, 3=左右ボタン
 		  isPanning = false;
-		  mapCon.style.cursor = '';
+		  updateCursor(COL_MAP[selCol]);
 	      }
 	  }
 	  const cell = e.target.closest('.cell');
@@ -589,7 +606,7 @@
 	  }
 	  if (isPanning) {
 	      isPanning = false;
-	      mapCon.style.cursor = '';
+	      updateCursor(COL_MAP[selCol]);
 	  }
 	  if (isDrawing) {
 	      isDrawing = false;
@@ -719,9 +736,25 @@
 	  palCon.style.top = `${newY}px`;
       });
 
+      // 選択領域クリアボタンの処理
+      document.getElementById('clr-sel').addEventListener('click', () => {
+	  if (clipboard.topLeftIdx !== null) { // 選択範囲がある場合のみ実行
+	      const { topLeftIdx, width, height } = clipboard;
+	      const startCol = topLeftIdx % GrSZ;
+	      const startRow = Math.floor(topLeftIdx / GrSZ);
+	      for (let y = 0; y < height; y++) {
+		  for (let x = 0; x < width; x++) {
+		      handleCell((startRow + y) * GrSZ + (startCol + x), BsCOL);
+		  }
+	      }
+	      saveMap();
+	      clearSelection();
+	  }
+      });
       (() => {
 	  createPal();
 	  loadMap();
+	  updateCursor(COL_MAP[selCol]); // 初期カーソルを設定
       })();
 
       // ブラウザの右クリックメニューを無効化
@@ -741,6 +774,12 @@
 		  width: mapCon.clientWidth,
 		  height: mapCon.clientHeight,
 	      });
+
+	      // PiPウィンドウにタイトルを設定
+	      const pipTitle = document.createElement('title');
+	      pipTitle.textContent = 'Wiz Mapper - Map View';
+	      pipWindow.document.head.appendChild(pipTitle);
+
 	      [...document.styleSheets].forEach((styleSheet) => {
 		  const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
 		  const style = document.createElement('style');
